@@ -1,6 +1,7 @@
 package com.certflow.common.util;
 
 import com.certflow.common.domain.TemplateLayoutConfig;
+import com.certflow.common.util.design.DesignPdfRenderer;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -32,6 +33,11 @@ public final class PdfBoxRenderer {
     ) throws IOException {
         if (layout == null) {
             layout = new TemplateLayoutConfig();
+        }
+
+        // Design v2 (web editor): rendered by the dedicated design renderer.
+        if (layout.getDesign() != null && !layout.getDesign().isEmpty()) {
+            return DesignPdfRenderer.render(layout.getDesign(), qrCodeBytes, placeholders);
         }
 
         int width = layout.getWidth() > 0 ? layout.getWidth() : 842;

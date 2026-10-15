@@ -33,7 +33,7 @@ export async function downloadCertificate(certId: string): Promise<void> {
   }
   const res = await api.get(`/certificates/${certId}/render-data`);
   const data: CertificateRenderData = res.data.data;
-  downloadCertificatePdf(
+  await downloadCertificatePdf(
     {
       layout: data.layoutConfig,
       values: data.values,

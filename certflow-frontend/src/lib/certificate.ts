@@ -33,6 +33,12 @@ export interface LayoutConfig {
   height: number;
   textElements: TextElement[];
   qrCode: QrConfig;
+  /**
+   * Full editor design (version 2). When present, every renderer draws this and
+   * ignores textElements and qrCode, which are kept only so older renderers
+   * still produce a usable certificate.
+   */
+  design?: import('./designer').Design;
 }
 
 export interface CertificateValues {
