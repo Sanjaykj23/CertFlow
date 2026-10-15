@@ -1,0 +1,84 @@
+# ==============================================================================
+# CertFlow Git Ignore Rules
+# ==============================================================================
+
+# Secrets and Local Environment Configuration
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Compiled Java Classes & Maven Artifacts
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Maven Release & Dependency Artifacts
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Local Storage & Database Directories
+data/
+**/data/
+storage-data/
+**/storage-data/
+*.db
+*.mv.db
+*.trace.db
+
+# Node.js & Frontend Build Outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.eslintcache
+.stylelintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Crash Reports & Log Files
+*.log
+**/logs/
+hs_err_pid*
+replay_pid*
+
+# IDE & Editor Configurations
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+.factorypath
+bin/
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini

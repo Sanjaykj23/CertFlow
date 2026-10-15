@@ -1,0 +1,50 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: certflow-worker-pdf
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:26257/certflow?sslmode=disable}
+    username: ${DATABASE_USER:root}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_PDF:certflow-pdf-workers}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      concurrency: 3
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+
+certflow:
+  worker:
+    id: ${HOSTNAME:pdf-worker-1}
+  s3:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    region: ${S3_REGION:us-east-1}
+    bucket-templates: ${S3_BUCKET_TEMPLATES:certflow-templates}
+    bucket-certificates: ${S3_BUCKET_CERTIFICATES:certflow-certificates}
+  app:
+    public-verify-url: ${PUBLIC_VERIFY_BASE_URL:http://localhost:5173/verify}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    com.certflow: INFO
