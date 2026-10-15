@@ -177,7 +177,7 @@ const WorkerChips: React.FC<{ workers: WorkerInfo[] }> = ({ workers }) =>
   workers.length === 0 ? (
     <p className="text-[12px] text-ink-400">No workers reported</p>
   ) : (
-    <ul className="flex flex-wrap gap-1.5">
+    <ul className="flex flex-col gap-1.5">
       {workers.map((w, i) => {
         const busy = w.status === 'BUSY';
         return (
@@ -462,11 +462,11 @@ export const Pipeline: React.FC = () => {
           </div>
         </div>
         <div className="panel-body">
-          <div className="grid grid-cols-1 gap-6 min-[900px]:grid-cols-5">
+          <div className="grid grid-cols-1 gap-6 min-[900px]:grid-cols-4">
             <FlowNode
               title="1. API and database"
               caption="Saves the certificate and its job together in one transaction, so nothing is lost if the server crashes."
-              placement="min-[900px]:col-start-1 min-[900px]:row-start-1"
+              placement=""
               out="r"
               active={pending > 0}
             >
@@ -476,7 +476,7 @@ export const Pipeline: React.FC = () => {
             <FlowNode
               title="2. Outbox table"
               caption="A to-do list stored beside the data. Each row is a job waiting to be sent on."
-              placement="min-[900px]:col-start-2 min-[900px]:row-start-1"
+              placement=""
               out="r"
               active={pending > 0}
             >
@@ -488,7 +488,7 @@ export const Pipeline: React.FC = () => {
             <FlowNode
               title="3. Publisher"
               caption="Picks up outbox rows and hands them to the message queue. Several can run without grabbing the same row."
-              placement="min-[900px]:col-start-3 min-[900px]:row-start-1"
+              placement=""
               out="r"
               active={pending > 0 && !publisherDown}
               bad={publisherDown}
@@ -504,8 +504,7 @@ export const Pipeline: React.FC = () => {
             <FlowNode
               title="4. Queue: jobs"
               caption="A line of PDF jobs. Messages wait here until a worker is free."
-              placement="min-[900px]:col-start-4 min-[900px]:row-start-1"
-              out="r"
+              placement=""
               active={(jobs?.depth ?? 0) > 0}
             >
               <TopicBox name={jobs?.name ?? TOPIC_JOBS} topic={jobs} />
@@ -514,8 +513,7 @@ export const Pipeline: React.FC = () => {
             <FlowNode
               title="5. PDF workers"
               caption={`Each job is claimed by one worker only. ${counters.duplicateClaimsDropped ?? 0} repeat claims dropped so far.`}
-              placement="min-[900px]:col-start-5 min-[900px]:row-start-1"
-              out="d"
+              placement=""
               active={anyBusy(pdfWorkers)}
             >
               <WorkerChips workers={pdfWorkers} />
@@ -525,8 +523,8 @@ export const Pipeline: React.FC = () => {
             <FlowNode
               title="6. Queue: generated"
               caption="Finished certificates waiting to be emailed."
-              placement="min-[900px]:col-start-5 min-[900px]:row-start-2"
-              out="l"
+              placement=""
+              out="r"
               active={(generated?.depth ?? 0) > 0}
             >
               <TopicBox name={generated?.name ?? TOPIC_GENERATED} topic={generated} />
@@ -535,52 +533,54 @@ export const Pipeline: React.FC = () => {
             <FlowNode
               title="7. Email workers"
               caption="Send each certificate. If the mail server fails they wait longer after each try, then give up."
-              placement="min-[900px]:col-start-4 min-[900px]:row-start-2"
-              out="l"
+              placement=""
+              out="r"
               active={anyBusy(emailWorkers)}
             >
               <WorkerChips workers={emailWorkers} />
               <Stat label="Retries scheduled" value={counters.retriesScheduled ?? 0} tone={(counters.retriesScheduled ?? 0) > 0 ? 'warn' : undefined} />
-              <span
-                className={`cf-line y d -bottom-6 hidden min-[900px]:block ${smtpMode === 'PERMANENT' && anyBusy(emailWorkers) ? 'on' : ''}`}
-                aria-hidden="true"
-              />
             </FlowNode>
 
             <FlowNode
               title="8. Mail server inbox"
               caption="Where delivered emails land. Open the inbox below to see them."
-              placement="min-[900px]:col-start-3 min-[900px]:row-start-2"
+              placement=""
               stackedOut={false}
             >
               <Stat label="Delivered" value={mailbox.length} tone={mailbox.length > 0 ? 'ok' : undefined} />
             </FlowNode>
 
-            <FlowNode
+            
+
+            
+          </div>
+          <div className="mt-8 border-t border-paper-200 pt-5">
+            <p className="eyebrow mb-3">Safety nets and helpers</p>
+            <div className="grid grid-cols-1 gap-6 min-[900px]:grid-cols-2">
+              <FlowNode
               title="Dead-letter queue"
               caption="Messages that cannot be delivered are parked here for a person to review. Nothing is silently dropped."
-              placement="min-[900px]:col-start-4 min-[900px]:row-start-3"
+              placement=""
               stackedOut={false}
               bad={dlqDepth > 0}
             >
               <TopicBox name={dlqTopic?.name ?? TOPIC_DLQ} topic={{ ...dlqTopic, depth: dlqDepth }} bad />
             </FlowNode>
-
-            <FlowNode
+              <FlowNode
               title="Redis cache"
               caption="Remembers public verification answers for 1 hour so repeat checks are instant. Revoking a certificate clears its entry."
-              placement="min-[900px]:col-start-1 min-[900px]:row-start-2"
+              placement=""
               stackedOut={false}
             >
               <Stat label="Hits" value={counters.cacheHits ?? 0} tone="ok" />
               <Stat label="Misses" value={counters.cacheMisses ?? 0} />
               <Stat label="Evictions" value={counters.cacheEvictions ?? 0} />
             </FlowNode>
+            </div>
+            <p className="mt-4 text-[12px] text-ink-400">
+              Email workers send a message to the dead-letter queue after the retries run out or the failure is permanent.
+            </p>
           </div>
-          {/* Email workers reach the dead-letter queue by a branch drawn below them on wide screens */}
-          <p className="mt-6 hidden text-[12px] text-ink-400 min-[900px]:block">
-            Email workers send failed messages down to the dead-letter queue after the retries run out or the failure is permanent.
-          </p>
         </div>
       </section>
 
