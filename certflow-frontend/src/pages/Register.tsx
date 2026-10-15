@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
-import { Award, Lock, Mail, User, Building2, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react';
+import { AuthShell } from './Login';
+import { AlertCircle, CheckCircle2, Info, ArrowRight } from 'lucide-react';
 
 export const Register: React.FC = () => {
   const [step, setStep] = useState<'DETAILS' | 'OTP'>('DETAILS');
@@ -14,6 +15,7 @@ export const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -33,10 +35,11 @@ export const Register: React.FC = () => {
 
       if (res.data.success) {
         setSuccessMsg(`We sent a 6-digit verification code to ${email}. Please check your inbox.`);
+        setDemoOtp(res.data.data?.demoOtp ? String(res.data.data.demoOtp) : null);
         setStep('OTP');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please check your inputs.');
+      setError(err.response?.data?.message || 'Registration failed. Check your details and try again.');
     } finally {
       setLoading(false);
     }
@@ -45,7 +48,7 @@ export const Register: React.FC = () => {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.trim().length !== 6) {
-      setError('Please enter the full 6-digit OTP code.');
+      setError('Enter the full 6-digit code.');
       return;
     }
     setError(null);
@@ -62,7 +65,7 @@ export const Register: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Verification failed. Please ensure the code is correct.');
+      setError(err.response?.data?.message || 'Verification failed. Check the code and try again.');
     } finally {
       setLoading(false);
     }
@@ -72,176 +75,153 @@ export const Register: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      await api.post('/auth/register', {
+      const res = await api.post('/auth/register', {
         fullName,
         email,
         password,
         organizationName,
       });
       setSuccessMsg(`A new code was sent to ${email}`);
+      if (res.data?.data?.demoOtp) setDemoOtp(String(res.data.data.demoOtp));
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to resend code');
+      setError(err.response?.data?.message || 'Could not resend the code. Wait a moment and try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const steps = [
+    { key: 'DETAILS', label: 'Details' },
+    { key: 'OTP', label: 'Verify email' },
+  ];
+  const current = step === 'DETAILS' ? 0 : 1;
+
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="w-12 h-12 bg-gradient-to-tr from-brand-600 to-sky-400 rounded-xl mx-auto flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
-          <Award className="w-6 h-6" />
-        </div>
-        <h2 className="mt-4 text-3xl font-extrabold text-white tracking-tight">Create your Account</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          {step === 'DETAILS' ? 'Launch and distribute thousands of certificates in seconds' : 'Verify your email to activate your account'}
-        </p>
-      </div>
+    <AuthShell>
+      <ol className="mb-6 flex items-center gap-3" aria-label="Registration steps">
+        {steps.map((s, i) => (
+          <li key={s.key} className="flex flex-1 items-center gap-2" aria-current={i === current ? 'step' : undefined}>
+            <span
+              className={`num flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] ${
+                i < current
+                  ? 'border-seal-600 bg-seal-600 text-white'
+                  : i === current
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-paper-300 text-ink-400'
+              }`}
+            >
+              {i < current ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+            </span>
+            <span className={`text-[12px] font-semibold ${i === current ? 'text-ink' : 'text-ink-400'}`}>{s.label}</span>
+            {i < steps.length - 1 && <span className="h-px flex-1 bg-paper-300" />}
+          </li>
+        ))}
+      </ol>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-slate-800/80 border border-slate-700/80 backdrop-blur-sm py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
-          {error && (
-            <div className="mb-4 p-3 bg-red-950/60 border border-red-800/60 rounded-xl text-red-300 text-xs font-medium">
-              {error}
-            </div>
-          )}
+      <h2 className="page-title">{step === 'DETAILS' ? 'Create your account' : 'Verify your email'}</h2>
+      <p className="page-lead">
+        {step === 'DETAILS'
+          ? 'Set up your organization and start issuing certificates.'
+          : 'Enter the code we emailed you to activate the account.'}
+      </p>
 
-          {successMsg && (
-            <div className="mb-4 p-3 bg-emerald-950/60 border border-emerald-800/60 rounded-xl text-emerald-300 text-xs font-medium flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
-          {step === 'DETAILS' ? (
-            <form className="space-y-4" onSubmit={handleRequestOtp}>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Your Full Name</label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Dr. Rajesh Kumar"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full pl-9 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Work Email</label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="organizer@university.edu"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Initial Organization Name</label>
-                <div className="relative">
-                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. National Hackathon Council"
-                    value={organizationName}
-                    onChange={(e) => setOrganizationName(e.target.value)}
-                    className="w-full pl-9 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Password (min 8 chars)</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-brand-600 to-sky-500 text-white text-sm font-semibold rounded-xl hover:from-brand-500 hover:to-sky-400 focus:outline-none shadow-lg shadow-brand-600/30 transition disabled:opacity-50 cursor-pointer mt-2"
-              >
-                {loading ? 'Sending Verification Code...' : 'Send Verification OTP'}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-          ) : (
-            <form className="space-y-5" onSubmit={handleVerifyOtp}>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Enter 6-Digit Email Code sent to <strong className="text-sky-400">{email}</strong>
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    placeholder="123456"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="w-full pl-9 pr-3.5 py-3 bg-slate-900 border border-slate-700 rounded-xl text-lg font-mono tracking-widest text-center text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || otp.length !== 6}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-sm font-semibold rounded-xl hover:from-emerald-500 hover:to-teal-400 focus:outline-none shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 cursor-pointer"
-              >
-                {loading ? 'Verifying...' : 'Verify Email & Create Account'}
-                <CheckCircle2 className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center justify-between text-xs pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep('DETAILS')}
-                  className="text-slate-400 hover:text-slate-200 cursor-pointer"
-                >
-                  ← Edit Information
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={loading}
-                  className="text-sky-400 hover:text-sky-300 font-medium cursor-pointer"
-                >
-                  Resend Code
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="mt-6 text-center text-xs text-slate-400">
-            Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-sky-400 hover:text-sky-300 underline underline-offset-2">
-              Sign in
-            </Link>
+      <div className="mt-6 space-y-4">
+        {error && (
+          <div className="alert-error" role="alert">
+            <AlertCircle className="mt-px h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
-        </div>
+        )}
+        {successMsg && (
+          <div className="alert-ok" role="status">
+            <CheckCircle2 className="mt-px h-4 w-4 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        {step === 'DETAILS' ? (
+          <form className="space-y-4" onSubmit={handleRequestOtp}>
+            <div>
+              <label htmlFor="reg-name" className="label">Full name</label>
+              <input id="reg-name" type="text" required autoComplete="name" placeholder="Dr. Rajesh Kumar"
+                value={fullName} onChange={(e) => setFullName(e.target.value)} className="input" />
+            </div>
+            <div>
+              <label htmlFor="reg-email" className="label">Work email</label>
+              <input id="reg-email" type="email" required autoComplete="email" placeholder="organizer@university.edu"
+                value={email} onChange={(e) => setEmail(e.target.value)} className="input" />
+            </div>
+            <div>
+              <label htmlFor="reg-org" className="label">Organization name</label>
+              <input id="reg-org" type="text" required autoComplete="organization" placeholder="National Hackathon Council"
+                value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} className="input" />
+            </div>
+            <div>
+              <label htmlFor="reg-password" className="label">Password</label>
+              <input id="reg-password" type="password" required minLength={8} autoComplete="new-password"
+                value={password} onChange={(e) => setPassword(e.target.value)} className="input" />
+              <p className="hint">Use at least 8 characters.</p>
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary h-10 w-full">
+              {loading ? 'Sending code...' : 'Send verification code'}
+              {!loading && <ArrowRight className="h-4 w-4" />}
+            </button>
+          </form>
+        ) : (
+          <form className="space-y-4" onSubmit={handleVerifyOtp}>
+            <div>
+              <label htmlFor="reg-otp" className="label">
+                6-digit code sent to <span className="font-mono">{email}</span>
+              </label>
+              <input
+                id="reg-otp"
+                type="text"
+                inputMode="numeric"
+                required
+                maxLength={6}
+                autoComplete="one-time-code"
+                placeholder="123456"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                className="input num h-12 text-center text-[20px] tracking-[0.4em]"
+              />
+            </div>
+
+            {demoOtp && (
+              <div className="alert-info items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Info className="h-4 w-4 shrink-0" />
+                  Demo code: <span className="num font-semibold">{demoOtp}</span>
+                </span>
+                <button type="button" className="btn-secondary btn-sm" onClick={() => setOtp(demoOtp.replace(/[^0-9]/g, '').slice(0, 6))}>
+                  Use this code
+                </button>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading || otp.length !== 6} className="btn-primary h-10 w-full">
+              {loading ? 'Verifying...' : 'Verify email and create account'}
+            </button>
+
+            <div className="flex items-center justify-between text-[13px]">
+              <button type="button" onClick={() => setStep('DETAILS')} className="rounded font-semibold text-ink-500 hover:text-ink">
+                Edit details
+              </button>
+              <button type="button" onClick={handleResendOtp} disabled={loading}
+                className="rounded font-semibold text-seal-700 hover:underline disabled:opacity-50">
+                Resend code
+              </button>
+            </div>
+          </form>
+        )}
       </div>
-    </div>
+
+      <p className="mt-6 text-[13px] text-ink-500">
+        Already have an account?{' '}
+        <Link to="/login" className="rounded font-semibold text-seal-700 hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </AuthShell>
   );
 };

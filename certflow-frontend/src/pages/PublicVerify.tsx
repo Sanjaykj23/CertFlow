@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import {
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Award,
-  Calendar,
-  Building2,
-  ShieldCheck,
-  ExternalLink
-} from 'lucide-react';
+import { Logo, Seal, Spinner } from '../components/ui';
+import { CertificateCanvas } from '../components/CertificateCanvas';
+
+const fmtDate = (v?: string) =>
+  v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
+
+const Field: React.FC<{ label: string; children: React.ReactNode; mono?: boolean }> = ({ label, children, mono }) => (
+  <div className="py-3">
+    <dt className="eyebrow">{label}</dt>
+    <dd className={`mt-1 break-words text-[15px] text-ink ${mono ? 'num text-[14px]' : ''}`}>{children}</dd>
+  </div>
+);
 
 export const PublicVerify: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -37,13 +39,21 @@ export const PublicVerify: React.FC = () => {
     verify();
   }, [token]);
 
+  const footer = (
+    <footer className="mt-10 flex flex-col gap-3 border-t border-paper-300 pt-5 sm:flex-row sm:items-center sm:justify-between">
+      <span className="inline-flex items-center gap-2 text-[12px] text-ink-500">
+        Verified by <Logo size={20} className="!gap-1.5 [&>span:last-child]:!text-[14px]" />
+      </span>
+      <Link to="/login" className="rounded text-[12px] font-semibold text-seal-700 hover:underline">
+        Back to CertFlow sign in
+      </Link>
+    </footer>
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-sm text-slate-400">Verifying cryptographic certificate authenticity...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-paper p-4">
+        <Spinner label="Checking the registry" />
       </div>
     );
   }
@@ -51,116 +61,98 @@ export const PublicVerify: React.FC = () => {
   const isValid = data?.valid === true;
   const isRevoked = data?.status === 'REVOKED';
   const isReplaced = data?.status === 'REPLACED';
+  const hasRecord = !!data?.certificateNumber;
+  const preview = data?.preview;
+
+  let tone: 'foil' | 'bad' | 'muted' = 'muted';
+  let heading = 'Certificate not found';
+  let lead = data?.message || 'No certificate matches this link. Check that you scanned the full QR code, or ask the issuer for a new copy.';
+  if (isValid) {
+    tone = 'foil';
+    heading = 'Verified certificate';
+    lead = 'The issuer registered this certificate and it is currently valid.';
+  } else if (isRevoked) {
+    tone = 'bad';
+    heading = 'Certificate revoked';
+    lead = 'The issuer has revoked this certificate. It is no longer valid.';
+  } else if (isReplaced) {
+    tone = 'bad';
+    heading = 'Certificate superseded';
+    lead = 'The issuer replaced this certificate with a newer one. This copy is no longer valid. Ask the holder for the current certificate.';
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full mx-auto space-y-6">
-        {/* Brand Header */}
-        <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-tr from-brand-600 to-sky-400 rounded-2xl mx-auto flex items-center justify-center text-white shadow-xl shadow-brand-500/20">
-            <ShieldCheck className="w-7 h-7" />
-          </div>
-          <h2 className="mt-3 text-2xl font-black text-white tracking-tight">CertFlow Official Registry</h2>
-          <p className="text-xs text-slate-400">Cryptographic Verification & Authenticity Portal</p>
+    <div className="min-h-screen bg-paper px-4 py-8 sm:px-8 sm:py-12">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8">
+          <Logo />
         </div>
 
-        {/* Verification Status Card */}
-        <div className="bg-slate-800/90 border border-slate-700/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-          {/* Status Badge */}
-          <div className="text-center space-y-2">
-            {isValid ? (
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 font-bold text-sm shadow-sm">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>OFFICIAL & VALID</span>
-              </div>
-            ) : isRevoked ? (
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-950/80 border border-rose-500/40 text-rose-400 font-bold text-sm shadow-sm">
-                <XCircle className="w-4 h-4 text-rose-400" />
-                <span>CERTIFICATE REVOKED</span>
-              </div>
-            ) : isReplaced ? (
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-400 font-bold text-sm shadow-sm">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
-                <span>SUPERSEDED / REPLACED</span>
-              </div>
-            ) : (
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-800 border border-slate-600 text-slate-400 font-bold text-sm">
-                <XCircle className="w-4 h-4 text-slate-400" />
-                <span>NOT FOUND / INVALID</span>
-              </div>
-            )}
-
-            <p className="text-xs text-slate-300 max-w-xs mx-auto pt-1">
-              {data?.message}
-            </p>
+        <section className="panel guilloche overflow-hidden">
+          <div className="flex flex-col gap-5 border-b border-paper-200 p-6 sm:flex-row sm:items-center sm:p-8">
+            <Seal size={tone === 'muted' ? 72 : 96} tone={tone} mark={tone === 'foil' ? 'check' : 'cross'} />
+            <div className="min-w-0">
+              <p className="eyebrow mb-1.5">
+                {isValid ? 'Registry check passed' : hasRecord ? 'Registry check failed' : 'Registry check'}
+              </p>
+              <h1 className="page-title">{heading}</h1>
+              <p className="page-lead">{lead}</p>
+            </div>
           </div>
 
-          {/* Certificate Public Metadata */}
-          {data?.certificateNumber && (
-            <div className="bg-slate-900/60 rounded-2xl border border-slate-700/60 p-5 space-y-3.5 text-xs">
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Recipient Name
-                </span>
-                <p className="text-base font-bold text-white mt-0.5">{data.participantName}</p>
-              </div>
+          {hasRecord && (
+            <div className="p-6 sm:p-8">
+              <dl className="grid divide-y divide-paper-200 sm:grid-cols-2 sm:gap-x-10 sm:divide-y-0">
+                <Field label="Recipient">
+                  <span className="font-display text-[20px] font-semibold">{data.participantName}</span>
+                </Field>
+                <Field label="Event or achievement">{data.eventName}</Field>
+                <Field label="Issuing organization">{data.organizationName}</Field>
+                <Field label="Issue date">{fmtDate(data.issueDate)}</Field>
+                <Field label="Certificate number" mono>{data.certificateNumber}</Field>
+                {(isRevoked || isReplaced) && data.revokedAt && (
+                  <Field label={isRevoked ? 'Revoked on' : 'Replaced on'}>{fmtDate(data.revokedAt)}</Field>
+                )}
+              </dl>
 
-              <div className="border-t border-slate-800 pt-3">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Event / Achievement
-                </span>
-                <p className="text-sm font-semibold text-slate-200 mt-0.5">{data.eventName}</p>
-              </div>
-
-              <div className="border-t border-slate-800 pt-3 grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                    Issuing Organization
+              {(isRevoked || isReplaced) && data.revocationReason && (
+                <div className="alert-error mt-4">
+                  <span>
+                    <span className="font-semibold">Reason given by the issuer: </span>
+                    {data.revocationReason}
                   </span>
-                  <p className="text-xs font-semibold text-slate-300 mt-0.5">{data.organizationName}</p>
                 </div>
-                <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                    Issue Date
-                  </span>
-                  <p className="text-xs font-semibold text-slate-300 mt-0.5">
-                    {data.issueDate ? new Date(data.issueDate).toLocaleDateString() : '—'}
-                  </p>
-                </div>
-              </div>
+              )}
 
-              <div className="border-t border-slate-800 pt-3">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Certificate ID
-                </span>
-                <p className="text-xs font-mono font-bold text-brand-400 mt-0.5">
-                  {data.certificateNumber}
-                </p>
-              </div>
+              <p className="mt-5 text-[12px] leading-relaxed text-ink-500">
+                This page shows only public details. Contact information and internal records stay private.
+              </p>
+            </div>
+          )}
+        </section>
 
-              {isRevoked && data.revocationReason && (
-                <div className="border-t border-rose-900/50 pt-3 bg-rose-950/20 p-2.5 rounded-lg border">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
-                    Revocation Details
+        {preview?.layoutConfig && (
+          <section className="mt-8" aria-label="Certificate proof">
+            <p className="eyebrow mb-2">Certificate proof</p>
+            <div className="relative overflow-hidden border border-ink-300 bg-white p-2 sm:p-3">
+              <CertificateCanvas
+                layout={preview.layoutConfig}
+                values={preview.values}
+                verifyUrl={window.location.href}
+                className="h-auto w-full"
+              />
+              {isRevoked && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+                  <span className="-rotate-[20deg] select-none rounded border-4 border-bad-500/40 px-5 py-1 font-display text-[clamp(40px,12vw,120px)] font-bold uppercase tracking-widest text-bad-500/30">
+                    Revoked
                   </span>
-                  <p className="text-xs text-rose-300 mt-0.5 font-medium">{data.revocationReason}</p>
-                  {data.revokedAt && (
-                    <span className="text-[10px] text-rose-400/80 block mt-1">
-                      Revoked on {new Date(data.revokedAt).toLocaleString()}
-                    </span>
-                  )}
                 </div>
               )}
             </div>
-          )}
+          </section>
+        )}
 
-          {/* Privacy Note */}
-          <div className="text-center pt-2">
-            <p className="text-[10px] text-slate-500 leading-relaxed">
-              🔒 Verified by CertFlow tamper-evident registry. Private personal contact information and internal keys are never exposed publicly.
-            </p>
-          </div>
-        </div>
+        {footer}
       </div>
     </div>
   );

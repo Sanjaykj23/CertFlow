@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { ScrollText, ShieldAlert, Clock, User } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { PageHeader, StatusStamp, EmptyState, PageLoading, formatWhen } from '../components/ui';
 
 export const AuditLogs: React.FC = () => {
   const { activeOrg } = useAuth();
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('');
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -25,57 +27,86 @@ export const AuditLogs: React.FC = () => {
     fetchLogs();
   }, [activeOrg]);
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Security & Audit Trail</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Immutable audit records of sensitive operations, batch launches, revocations, and replacements.
-        </p>
-      </div>
+  const actorOf = (l: any): string =>
+    l.actorName || l.actorEmail || l.userEmail || l.userName || l.actor || l.userId || '-';
+  const targetOf = (l: any): string =>
+    [l.resourceType, l.resourceId].filter(Boolean).join(' ') || '-';
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+  const q = filter.trim().toLowerCase();
+  const shown = q
+    ? logs.filter((l) =>
+        [l.action, actorOf(l), targetOf(l), l.detailsJson].some((v) => String(v ?? '').toLowerCase().includes(q))
+      )
+    : logs;
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Security"
+        title="Audit log"
+        description="A record of sensitive actions in this organization: batch launches, revocations and replacements. Showing the latest 100."
+      />
+
+      <section className="panel mb-5">
+        <div className="panel-body">
+          <label htmlFor="audit-filter" className="label">Filter</label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <input
+              id="audit-filter"
+              type="search"
+              className="input pl-9"
+              placeholder="Action, actor, target or details"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="panel overflow-hidden">
         {loading ? (
-          <div className="h-48 flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : logs.length > 0 ? (
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-semibold">
-                <th className="py-3 px-4">Timestamp</th>
-                <th className="py-3 px-4">Action</th>
-                <th className="py-3 px-4">Resource</th>
-                <th className="py-3 px-4">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/50 transition">
-                  <td className="py-3 px-4 text-slate-400 font-mono">
-                    {new Date(log.createdAt).toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-900">
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono">
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-slate-600 font-medium">
-                    {log.resourceType}
-                  </td>
-                  <td className="py-3 px-4 text-slate-500 font-mono text-[11px] max-w-md truncate">
-                    {log.detailsJson || '—'}
-                  </td>
+          <PageLoading label="Loading audit log" />
+        ) : shown.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="ledger w-full">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Target</th>
+                  <th>Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="p-12 text-center text-slate-400 text-xs">
-            No audit records logged yet. Operations such as certificate revocation or replacement will appear here.
+              </thead>
+              <tbody>
+                {shown.map((log) => (
+                  <tr key={log.id}>
+                    <td className="whitespace-nowrap font-mono text-[12px] text-ink-500">{formatWhen(log.createdAt)}</td>
+                    <td className="text-ink-700">{actorOf(log)}</td>
+                    <td>
+                      <StatusStamp status={log.action} tone="seal" dot={false} />
+                    </td>
+                    <td className="font-mono text-[12px] text-ink-600">{targetOf(log)}</td>
+                    <td className="max-w-md truncate font-mono text-[11px] text-ink-500" title={log.detailsJson || ''}>
+                      {log.detailsJson || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        ) : (
+          <EmptyState
+            title={logs.length === 0 ? 'No audit records yet' : 'No records match your filter'}
+            description={
+              logs.length === 0
+                ? 'Revoking or replacing a certificate, or launching a batch, adds a record here.'
+                : 'Clear the filter to see all 100 recent records.'
+            }
+          />
         )}
-      </div>
+      </section>
     </div>
   );
 };

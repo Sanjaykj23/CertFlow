@@ -3,7 +3,176 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
-    @apply font-sans;
+    @apply bg-paper font-sans text-ink antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  h1, h2, h3 {
+    @apply font-display;
+    text-wrap: balance;
+  }
+  ::selection {
+    @apply bg-seal-500 text-white;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-seal-500/50 ring-offset-1 ring-offset-paper;
+  }
+  input[type='checkbox'] {
+    @apply accent-seal-600;
+  }
+}
+
+@layer components {
+  /* ---------- Surfaces ---------- */
+  .panel {
+    @apply rounded-panel border border-paper-200 bg-white shadow-panel;
+  }
+  .panel-head {
+    @apply flex items-center justify-between gap-3 border-b border-paper-200 px-5 py-3.5;
+  }
+  .panel-title {
+    @apply font-display text-[15px] font-semibold tracking-tight text-ink;
+  }
+  .panel-body {
+    @apply p-5;
+  }
+  .panel-muted {
+    @apply rounded-panel border border-paper-200 bg-paper-50;
+  }
+
+  /* ---------- Type helpers ---------- */
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-400;
+  }
+  .page-title {
+    @apply font-display text-[28px] font-semibold leading-tight tracking-tight text-ink;
+  }
+  .page-lead {
+    @apply mt-1.5 max-w-2xl text-[14px] leading-relaxed text-ink-500;
+  }
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex h-9 select-none items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-3.5 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-seal-600 text-white hover:bg-seal-700 active:bg-seal-800;
+  }
+  .btn-dark {
+    @apply btn bg-ink text-white hover:bg-ink-800;
+  }
+  .btn-secondary {
+    @apply btn border-paper-300 bg-white text-ink-700 hover:border-ink-300 hover:bg-paper-50;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-paper-100 hover:text-ink;
+  }
+  .btn-danger {
+    @apply btn bg-bad-500 text-white hover:bg-bad-700;
+  }
+  .btn-danger-ghost {
+    @apply btn text-bad-500 hover:bg-bad-50;
+  }
+  .btn-sm {
+    @apply h-8 px-3 text-[12px];
+  }
+  .btn-icon {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-paper-100 hover:text-ink disabled:opacity-50;
+  }
+
+  /* ---------- Forms ---------- */
+  .label {
+    @apply mb-1.5 block text-[12px] font-semibold text-ink-700;
+  }
+  .hint {
+    @apply mt-1.5 text-[12px] text-ink-400;
+  }
+  .input {
+    @apply block h-10 w-full rounded-md border border-paper-300 bg-white px-3 text-[14px] text-ink placeholder:text-ink-300 transition-colors hover:border-ink-300 focus:border-seal-500 focus:outline-none focus:ring-2 focus:ring-seal-500/20 disabled:bg-paper-100 disabled:text-ink-400;
+  }
+  textarea.input {
+    @apply h-auto min-h-[88px] py-2.5;
+  }
+  select.input {
+    @apply pr-8;
+  }
+  .alert {
+    @apply flex items-start gap-2.5 rounded-md border px-3.5 py-3 text-[13px] leading-snug;
+  }
+  .alert-error {
+    @apply alert border-bad-500/25 bg-bad-50 text-bad-700;
+  }
+  .alert-ok {
+    @apply alert border-ok-500/25 bg-ok-50 text-ok-700;
+  }
+  .alert-info {
+    @apply alert border-info-500/25 bg-info-50 text-info-700;
+  }
+  .alert-warn {
+    @apply alert border-warn-500/25 bg-warn-50 text-warn-700;
+  }
+
+  /* ---------- Status stamps ---------- */
+  .stamp {
+    @apply inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10.5px] font-medium uppercase tracking-wider;
+  }
+  .stamp-ok { @apply stamp border-ok-500/30 bg-ok-50 text-ok-700; }
+  .stamp-warn { @apply stamp border-warn-500/30 bg-warn-50 text-warn-700; }
+  .stamp-bad { @apply stamp border-bad-500/30 bg-bad-50 text-bad-700; }
+  .stamp-info { @apply stamp border-info-500/30 bg-info-50 text-info-700; }
+  .stamp-neutral { @apply stamp border-paper-300 bg-paper-100 text-ink-500; }
+  .stamp-seal { @apply stamp border-seal-500/30 bg-seal-50 text-seal-700; }
+  .stamp-foil { @apply stamp border-foil-500/40 bg-foil-50 text-foil-600; }
+
+  /* ---------- Ledger tables ---------- */
+  .ledger {
+    @apply w-full border-collapse text-left text-[13px];
+  }
+  .ledger thead th {
+    @apply whitespace-nowrap border-b border-paper-200 bg-paper-50 px-4 py-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-400;
+  }
+  .ledger tbody td {
+    @apply border-b border-paper-100 px-4 py-3 align-middle text-ink-700;
+  }
+  .ledger tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .ledger tbody tr:hover td {
+    @apply bg-paper-50;
+  }
+
+  /* ---------- Overlays ---------- */
+  .scrim {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4 backdrop-blur-[2px];
+  }
+  .dialog {
+    @apply w-full max-w-md rounded-panel border border-paper-200 bg-white shadow-pop;
+  }
+  .menu {
+    @apply absolute z-40 min-w-[14rem] rounded-lg border border-paper-200 bg-white p-1.5 shadow-pop;
+  }
+  .menu-item {
+    @apply flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-[13px] text-ink-700 transition-colors hover:bg-paper-100;
+  }
+
+  /* ---------- Progress ---------- */
+  .meter {
+    @apply h-1.5 w-full overflow-hidden rounded-full bg-paper-200;
+  }
+  .meter > span {
+    @apply block h-full rounded-full bg-seal-500 transition-all duration-500;
+  }
+
+  /* ---------- Decorative ---------- */
+  .guilloche {
+    background-image:
+      repeating-radial-gradient(circle at 0 0, transparent 0 9px, rgba(18, 135, 127, 0.07) 9px 10px),
+      repeating-radial-gradient(circle at 100% 100%, transparent 0 9px, rgba(194, 138, 27, 0.08) 9px 10px);
   }
 }

@@ -1,139 +1,222 @@
-import React, { useState } from 'react';
-import { useAuth, OrgMembership } from '../context/AuthContext';
-import { Building2, ChevronDown, LogOut, User as UserIcon, Plus } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { NavLink, Link } from 'react-router-dom';
+import { Building2, ChevronDown, LogOut, Plus, Check } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
+import { Logo, Modal } from './ui';
+
+const NAV_ITEMS = [
+  { to: '/', label: 'Overview', end: true },
+  { to: '/events', label: 'Events', end: false },
+  { to: '/certificates', label: 'Certificates', end: false },
+  { to: '/pipeline', label: 'Pipeline', end: false },
+  { to: '/members', label: 'Team', end: false },
+  { to: '/audit-logs', label: 'Audit', end: false },
+];
 
 export const Navbar: React.FC = () => {
   const { user, activeOrg, switchOrg, logout, refreshUser } = useAuth();
   const [showOrgMenu, setShowOrgMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNewOrgModal, setShowNewOrgModal] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const orgRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (orgRef.current && !orgRef.current.contains(e.target as Node)) setShowOrgMenu(false);
+      if (userRef.current && !userRef.current.contains(e.target as Node)) setShowUserMenu(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
 
   const handleCreateOrg = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOrgName.trim()) return;
-    setLoading(true);
+    setCreating(true);
+    setError('');
     try {
       await api.post('/organizations', { name: newOrgName.trim() });
       await refreshUser();
       setNewOrgName('');
       setShowNewOrgModal(false);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to create organization');
+      setError(err.response?.data?.message || 'Could not create the organization. Try again.');
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   };
 
+  const initial = user?.fullName?.charAt(0).toUpperCase() || 'U';
+
   return (
-    <header className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-8 sticky top-0 z-30 shadow-sm">
-      {/* Organization Switcher Dropdown */}
-      <div className="relative">
-        <button
-          onClick={() => setShowOrgMenu(!showOrgMenu)}
-          className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition text-sm font-medium text-slate-700"
-        >
-          <Building2 className="w-4 h-4 text-brand-600" />
-          <span>{activeOrg?.organizationName || 'Select Organization'}</span>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-        </button>
+    <header className="sticky top-0 z-30 border-b border-paper-200 bg-white/95 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-[1240px] items-center gap-4 px-4 sm:px-6">
+        <Link to="/" className="shrink-0" aria-label="CertFlow home">
+          <Logo />
+        </Link>
 
-        {showOrgMenu && (
-          <div className="absolute left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-40">
-            <p className="px-3.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Your Organizations
-            </p>
-            {user?.organizations?.map((org) => (
-              <button
-                key={org.organizationId}
-                onClick={() => {
-                  switchOrg(org);
-                  setShowOrgMenu(false);
-                }}
-                className={`w-full text-left px-3.5 py-2 text-sm flex items-center justify-between hover:bg-slate-50 ${
-                  activeOrg?.organizationId === org.organizationId ? 'font-semibold text-brand-600 bg-brand-50/50' : 'text-slate-700'
-                }`}
-              >
-                <span className="truncate">{org.organizationName}</span>
-                <span className="text-[10px] text-slate-400 uppercase">{org.role}</span>
-              </button>
-            ))}
-            <div className="border-t border-slate-100 mt-1 pt-1">
-              <button
-                onClick={() => {
-                  setShowOrgMenu(false);
-                  setShowNewOrgModal(true);
-                }}
-                className="w-full text-left px-3.5 py-2 text-sm text-brand-600 hover:bg-brand-50 flex items-center gap-2 font-medium"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Create New Organization</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+        <span className="hidden h-5 w-px bg-paper-200 md:block" />
 
-      {/* User info & Logout */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-600 font-semibold text-xs">
-            {user?.fullName?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <div className="text-left hidden md:block">
-            <p className="text-sm font-semibold text-slate-800 leading-none">{user?.fullName}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{user?.email}</p>
-          </div>
-        </div>
-
-        <button
-          onClick={logout}
-          title="Sign Out"
-          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Create Org Modal */}
-      {showNewOrgModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Create Organization</h3>
-            <p className="text-xs text-slate-500 mb-4">Set up a new workspace for your college, company, or hackathon.</p>
-            <form onSubmit={handleCreateOrg}>
-              <div className="mb-4">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Organization Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Stanford ACM Chapter"
-                  value={newOrgName}
-                  onChange={(e) => setNewOrgName(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
+        {/* Organization switcher */}
+        <div className="relative hidden md:block" ref={orgRef}>
+          <button
+            type="button"
+            onClick={() => setShowOrgMenu((v) => !v)}
+            className="flex h-8 items-center gap-2 rounded-md border border-paper-200 bg-paper-50 px-2.5 text-[13px] font-medium text-ink-700 transition-colors hover:border-ink-300"
+            aria-expanded={showOrgMenu}
+          >
+            <Building2 className="h-3.5 w-3.5 text-seal-600" />
+            <span className="max-w-[160px] truncate">{activeOrg?.organizationName || 'Select organization'}</span>
+            <ChevronDown className="h-3 w-3 text-ink-400" />
+          </button>
+          {showOrgMenu && (
+            <div className="menu left-0 top-10">
+              <p className="eyebrow px-2.5 pb-1.5 pt-1">Organizations</p>
+              {user?.organizations?.map((org) => {
+                const active = activeOrg?.organizationId === org.organizationId;
+                return (
+                  <button
+                    key={org.organizationId}
+                    type="button"
+                    className="menu-item"
+                    onClick={() => {
+                      switchOrg(org);
+                      setShowOrgMenu(false);
+                    }}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      {active ? <Check className="h-3.5 w-3.5 shrink-0 text-seal-600" /> : <span className="w-3.5 shrink-0" />}
+                      <span className={`truncate ${active ? 'font-semibold text-ink' : ''}`}>{org.organizationName}</span>
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink-400">{org.role}</span>
+                  </button>
+                );
+              })}
+              <div className="mt-1 border-t border-paper-100 pt-1">
                 <button
                   type="button"
-                  onClick={() => setShowNewOrgModal(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-50"
+                  className="menu-item justify-start gap-2 font-semibold text-seal-700"
+                  onClick={() => {
+                    setShowOrgMenu(false);
+                    setShowNewOrgModal(true);
+                  }}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-4 py-2 bg-brand-600 text-white text-xs font-semibold rounded-lg hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {loading ? 'Creating...' : 'Create Workspace'}
+                  <Plus className="h-3.5 w-3.5" />
+                  New organization
                 </button>
               </div>
-            </form>
+            </div>
+          )}
+        </div>
+
+        <nav className="ml-2 hidden flex-1 items-center gap-0.5 lg:flex" aria-label="Primary">
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `relative rounded-md px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                  isActive ? 'text-ink' : 'text-ink-500 hover:text-ink'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {item.label}
+                  {isActive && <span className="absolute inset-x-3 -bottom-[13px] h-[2px] rounded-full bg-seal-600" />}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-2 lg:ml-0" ref={userRef}>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowUserMenu((v) => !v)}
+              className="flex h-8 items-center gap-2 rounded-md pl-1 pr-2 transition-colors hover:bg-paper-100"
+              aria-expanded={showUserMenu}
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink font-display text-[11px] font-semibold text-white">
+                {initial}
+              </span>
+              <span className="hidden text-[13px] font-semibold text-ink-700 sm:block">{user?.fullName}</span>
+              <ChevronDown className="h-3 w-3 text-ink-400" />
+            </button>
+            {showUserMenu && (
+              <div className="menu right-0 top-10">
+                <div className="border-b border-paper-100 px-2.5 pb-2.5 pt-1.5">
+                  <p className="text-[13px] font-semibold text-ink">{user?.fullName}</p>
+                  <p className="truncate text-[12px] text-ink-400">{user?.email}</p>
+                </div>
+                <button type="button" className="menu-item mt-1 justify-start gap-2 text-bad-500" onClick={logout}>
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Compact navigation for narrow screens */}
+      <nav className="flex gap-1 overflow-x-auto border-t border-paper-100 px-3 py-1.5 lg:hidden" aria-label="Primary">
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `shrink-0 rounded-md px-3 py-1.5 text-[13px] font-semibold ${
+                isActive ? 'bg-seal-50 text-seal-700' : 'text-ink-500'
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <Modal
+        open={showNewOrgModal}
+        onClose={() => setShowNewOrgModal(false)}
+        title="New organization"
+        description="A separate workspace for a college, company or hackathon."
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={() => setShowNewOrgModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" form="new-org-form" className="btn-primary" disabled={creating}>
+              {creating ? 'Creating' : 'Create workspace'}
+            </button>
+          </>
+        }
+      >
+        <form id="new-org-form" onSubmit={handleCreateOrg} className="space-y-3">
+          {error && <div className="alert-error">{error}</div>}
+          <div>
+            <label className="label" htmlFor="new-org-name">
+              Organization name
+            </label>
+            <input
+              id="new-org-name"
+              className="input"
+              required
+              placeholder="Easwari ACM Student Chapter"
+              value={newOrgName}
+              onChange={(e) => setNewOrgName(e.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
     </header>
   );
 };

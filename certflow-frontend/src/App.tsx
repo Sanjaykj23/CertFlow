@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -13,21 +13,27 @@ import { BatchProgress } from './pages/BatchProgress';
 import { Certificates } from './pages/Certificates';
 import { Members } from './pages/Members';
 import { AuditLogs } from './pages/AuditLogs';
+import { Pipeline } from './pages/Pipeline';
 import { PublicVerify } from './pages/PublicVerify';
+import { isDemo } from './lib/env';
+
+// Demo builds are often served from a sub-path or an embedded frame, so they
+// use hash routing and need no server-side rewrite rules.
+const Router: React.ComponentType<{ children: React.ReactNode }> = isDemo ? HashRouter : BrowserRouter;
 
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <Router>
         <Routes>
-          {/* Public Verification Route */}
+          {/* Public verification route */}
           <Route path="/verify/:token" element={<PublicVerify />} />
 
-          {/* Public Auth Routes */}
+          {/* Public auth routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Authenticated Dashboard Routes */}
+          {/* Authenticated routes */}
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="events" element={<Events />} />
@@ -36,6 +42,7 @@ export const App: React.FC = () => {
             <Route path="events/:eventId/import-csv" element={<CsvImport />} />
             <Route path="batches/:batchId/progress" element={<BatchProgress />} />
             <Route path="certificates" element={<Certificates />} />
+            <Route path="pipeline" element={<Pipeline />} />
             <Route path="members" element={<Members />} />
             <Route path="audit-logs" element={<AuditLogs />} />
           </Route>
@@ -43,7 +50,7 @@ export const App: React.FC = () => {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </AuthProvider>
   );
 };

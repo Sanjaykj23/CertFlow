@@ -1,19 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Upload, Palette, Download, RotateCcw, Ban, ExternalLink } from 'lucide-react';
 import api from '../api/client';
-import {
-  Calendar,
-  Layers,
-  Award,
-  Upload,
-  Palette,
-  FileCheck,
-  Download,
-  RotateCcw,
-  Ban,
-  ArrowLeft,
-  ExternalLink
-} from 'lucide-react';
+import { CertificateCanvas } from '../components/CertificateCanvas';
+import { EmptyState, Modal, PageHeader, PageLoading, StatusStamp } from '../components/ui';
+import { downloadCertificate } from '../lib/links';
 
 export const EventDetail: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -21,14 +12,15 @@ export const EventDetail: React.FC = () => {
   const [templates, setTemplates] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [certificates, setCertificates] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'batches' | 'templates' | 'certificates'>('batches');
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   // Revocation modal state
   const [revokeModalOpen, setRevokeModalOpen] = useState(false);
   const [selectedCertId, setSelectedCertId] = useState<string | null>(null);
   const [revokeReason, setRevokeReason] = useState('');
   const [revoking, setRevoking] = useState(false);
+  const [revokeError, setRevokeError] = useState('');
 
   const fetchEventData = async () => {
     try {
@@ -54,343 +46,297 @@ export const EventDetail: React.FC = () => {
     fetchEventData();
   }, [eventId]);
 
+  const closeRevoke = () => {
+    setRevokeModalOpen(false);
+    setRevokeError('');
+  };
+
   const handleRevoke = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCertId || !revokeReason.trim()) return;
     setRevoking(true);
+    setRevokeError('');
     try {
       await api.post(`/certificates/${selectedCertId}/revoke`, { reason: revokeReason.trim() });
       setRevokeModalOpen(false);
       setRevokeReason('');
       fetchEventData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to revoke certificate');
+      setRevokeError(err.response?.data?.message || 'The certificate was not revoked. Check your connection and try again.');
     } finally {
       setRevoking(false);
     }
   };
 
   const handleResend = async (certId: string) => {
+    setNotice(null);
     try {
       await api.post(`/certificates/${certId}/resend`);
-      alert('Email resend queued successfully!');
+      setNotice({ kind: 'ok', text: 'Email resend queued. The email status updates once it is delivered.' });
       fetchEventData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to resend email');
+      setNotice({ kind: 'error', text: err.response?.data?.message || 'The email was not queued. Check the recipient address and try again.' });
+    }
+  };
+
+  const handleDownload = async (certId: string) => {
+    setNotice(null);
+    try {
+      await downloadCertificate(certId);
+    } catch (err: any) {
+      setNotice({ kind: 'error', text: err?.response?.data?.message || 'The PDF did not download. Try again in a moment.' });
     }
   };
 
   if (loading && !event) {
-    return (
-      <div className="h-64 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <PageLoading label="Loading event" />;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Link to="/events" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 mb-3">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to all events</span>
-        </Link>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{event?.name}</h1>
-              <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold border border-brand-200">
-                {event?.archived ? 'Archived' : 'Active'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span>Event Date: <strong>{event?.eventDate}</strong></span>
-              <span>•</span>
-              <span>{event?.description || 'No description provided.'}</span>
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              to={`/events/${eventId}/templates/builder`}
-              className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 bg-white text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 shadow-sm transition"
-            >
-              <Palette className="w-4 h-4 text-brand-600" />
-              <span>Template Designer</span>
+    <div className="space-y-8">
+      <PageHeader
+        back={{ to: '/events', label: 'All events' }}
+        eyebrow={`Event / ${event?.eventDate || ''}`}
+        title={event?.name}
+        description={event?.description || 'No description provided.'}
+        actions={
+          <>
+            <StatusStamp status={event?.archived ? 'DRAFT' : 'ACTIVE'} label={event?.archived ? 'Archived' : 'Active'} />
+            <Link to={`/events/${eventId}/templates/builder`} className="btn-secondary">
+              <Palette className="h-4 w-4" />
+              Template designer
             </Link>
-            <Link
-              to={`/events/${eventId}/import-csv`}
-              className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-xs font-semibold rounded-lg hover:bg-brand-700 shadow-sm transition"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Issue Certificate Batch</span>
+            <Link to={`/events/${eventId}/import-csv`} className="btn-primary">
+              <Upload className="h-4 w-4" />
+              Issue batch
             </Link>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {/* Tabs */}
-      <div className="border-b border-slate-200 flex gap-6 text-sm font-semibold">
-        <button
-          onClick={() => setActiveTab('batches')}
-          className={`pb-3 relative transition ${
-            activeTab === 'batches' ? 'text-brand-600 border-b-2 border-brand-600' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Certificate Batches ({batches.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`pb-3 relative transition ${
-            activeTab === 'templates' ? 'text-brand-600 border-b-2 border-brand-600' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Templates ({templates.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('certificates')}
-          className={`pb-3 relative transition ${
-            activeTab === 'certificates' ? 'text-brand-600 border-b-2 border-brand-600' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Generated Certificates ({certificates.length})
-        </button>
-      </div>
-
-      {/* Tab 1: Batches */}
-      {activeTab === 'batches' && (
-        <div className="space-y-4">
-          {batches.length > 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 text-xs font-semibold uppercase text-slate-400 bg-slate-50/50">
-                    <th className="py-3 px-4">Batch Name</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Progress</th>
-                    <th className="py-3 px-4">Generated</th>
-                    <th className="py-3 px-4">Emails Sent</th>
-                    <th className="py-3 px-4">Failed</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {batches.map((b) => {
-                    const pct = b.totalCount > 0 ? Math.round(((b.generatedCount + b.failedCount) / b.totalCount) * 100) : 0;
-                    return (
-                      <tr key={b.id} className="hover:bg-slate-50/50 transition">
-                        <td className="py-3.5 px-4 font-semibold text-slate-900">{b.name}</td>
-                        <td className="py-3.5 px-4">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                            b.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                            b.status === 'PROCESSING' || b.status === 'QUEUED' ? 'bg-sky-50 text-sky-700 border border-sky-200 animate-pulse' :
-                            'bg-slate-100 text-slate-700'
-                          }`}>
-                            {b.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 w-40">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-brand-600 rounded-full" style={{ width: `${pct}%` }}></div>
-                            </div>
-                            <span className="text-xs font-semibold text-slate-600">{pct}%</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-slate-600">{b.generatedCount} / {b.totalCount}</td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-slate-600">{b.emailSentCount} / {b.totalCount}</td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-rose-600">{b.failedCount}</td>
-                        <td className="py-3.5 px-4 text-right">
-                          <Link
-                            to={`/batches/${b.id}/progress`}
-                            className="px-3 py-1 bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg text-xs font-semibold transition"
-                          >
-                            Live Monitor
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-              <Layers className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <h4 className="text-sm font-bold text-slate-800">No batches issued yet</h4>
-              <p className="text-xs text-slate-500 mt-1">Upload a CSV file of participant names and emails to issue certificates.</p>
-              <Link
-                to={`/events/${eventId}/import-csv`}
-                className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-brand-600 text-white text-xs font-semibold rounded-lg hover:bg-brand-700 transition"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload Participants CSV</span>
-              </Link>
-            </div>
-          )}
+      {notice && (
+        <div className={notice.kind === 'ok' ? 'alert-ok' : 'alert-error'} role={notice.kind === 'ok' ? 'status' : 'alert'}>
+          {notice.text}
         </div>
       )}
 
-      {/* Tab 2: Templates */}
-      {activeTab === 'templates' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {/* Template */}
+      <section className="panel" aria-labelledby="sec-template">
+        <div className="panel-head">
+          <div>
+            <p className="eyebrow">01 Template</p>
+            <h2 id="sec-template" className="panel-title mt-1">Certificate template</h2>
+          </div>
+        </div>
+        {templates.length > 0 ? (
+          <ul className="divide-y divide-paper-200">
             {templates.map((tpl) => (
-              <div key={tpl.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                    <span className="font-semibold text-brand-600 uppercase tracking-wider text-[10px]">
-                      {tpl.orientation} (v{tpl.version})
-                    </span>
-                    <span>{tpl.width} x {tpl.height} pt</span>
+              <li key={tpl.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+                {tpl.layoutConfig && (
+                  <div className="w-full shrink-0 overflow-hidden rounded-md border border-paper-200 sm:w-48">
+                    <CertificateCanvas layout={tpl.layoutConfig} />
                   </div>
-                  <h4 className="text-base font-bold text-slate-900">{tpl.name}</h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {tpl.layoutConfig?.textElements?.length || 0} customized placeholder elements configured.
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="eyebrow num">
+                    {tpl.orientation} / v{tpl.version}
+                  </p>
+                  <h3 className="mt-1 font-display text-[16px] font-semibold text-ink">{tpl.name}</h3>
+                  <p className="mt-1 text-[12px] text-ink-500">
+                    <span className="num">{tpl.width} x {tpl.height}</span> pt, with{' '}
+                    <span className="num">{tpl.layoutConfig?.textElements?.length || 0}</span> placeholder elements.
                   </p>
                 </div>
-                <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <Link
-                    to={`/events/${eventId}/templates/builder?templateId=${tpl.id}`}
-                    className="text-xs font-semibold text-brand-600 hover:text-brand-700"
-                  >
-                    Edit Template
-                  </Link>
-                </div>
-              </div>
+                <Link to={`/events/${eventId}/templates/builder?templateId=${tpl.id}`} className="btn-secondary btn-sm self-start sm:self-center">
+                  Edit template
+                </Link>
+              </li>
             ))}
-          </div>
-        </div>
-      )}
+          </ul>
+        ) : (
+          <EmptyState
+            title="No template yet"
+            description="Design the certificate layout before you issue a batch."
+            action={
+              <Link to={`/events/${eventId}/templates/builder`} className="btn-primary">
+                <Palette className="h-4 w-4" />
+                Open the template builder
+              </Link>
+            }
+          />
+        )}
+      </section>
 
-      {/* Tab 3: Certificates */}
-      {activeTab === 'certificates' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          {certificates.length > 0 ? (
-            <table className="w-full text-left text-sm">
+      {/* Batches */}
+      <section className="panel" aria-labelledby="sec-batches">
+        <div className="panel-head">
+          <div>
+            <p className="eyebrow">02 Batches</p>
+            <h2 id="sec-batches" className="panel-title mt-1">
+              Batches <span className="num text-ink-400">({batches.length})</span>
+            </h2>
+          </div>
+          <Link to={`/events/${eventId}/import-csv`} className="btn-secondary btn-sm">
+            <Upload className="h-3.5 w-3.5" />
+            Import CSV
+          </Link>
+        </div>
+        {batches.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="ledger">
               <thead>
-                <tr className="border-b border-slate-100 text-xs font-semibold uppercase text-slate-400 bg-slate-50/50">
-                  <th className="py-3 px-4">Certificate ID</th>
-                  <th className="py-3 px-4">Participant</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Validity</th>
-                  <th className="py-3 px-4">Email Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Batch</th>
+                  <th>Status</th>
+                  <th className="min-w-[140px]">Progress</th>
+                  <th>Generated</th>
+                  <th>Emailed</th>
+                  <th>Failed</th>
+                  <th className="text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
+                {batches.map((b) => {
+                  const pct = b.totalCount > 0 ? Math.round(((b.generatedCount + b.failedCount) / b.totalCount) * 100) : 0;
+                  return (
+                    <tr key={b.id}>
+                      <td className="font-medium text-ink">{b.name}</td>
+                      <td><StatusStamp status={b.status} /></td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <div className="meter"><span style={{ width: `${pct}%` }} /></div>
+                          <span className="num text-[12px] text-ink-500">{pct}%</span>
+                        </div>
+                      </td>
+                      <td className="num text-[12px]">{b.generatedCount} / {b.totalCount}</td>
+                      <td className="num text-[12px]">{b.emailSentCount} / {b.totalCount}</td>
+                      <td className={`num text-[12px] ${b.failedCount > 0 ? 'text-bad-700' : ''}`}>{b.failedCount}</td>
+                      <td className="text-right">
+                        <Link to={`/batches/${b.id}/progress`} className="btn-ghost btn-sm">Live monitor</Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="No batches issued yet"
+            description="Upload a CSV of participant names and emails to issue certificates."
+            action={
+              <Link to={`/events/${eventId}/import-csv`} className="btn-primary">
+                <Upload className="h-4 w-4" />
+                Import participants CSV
+              </Link>
+            }
+          />
+        )}
+      </section>
+
+      {/* Certificates */}
+      <section className="panel" aria-labelledby="sec-certs">
+        <div className="panel-head">
+          <div>
+            <p className="eyebrow">03 Certificates</p>
+            <h2 id="sec-certs" className="panel-title mt-1">
+              Issued certificates <span className="num text-ink-400">({certificates.length})</span>
+            </h2>
+          </div>
+        </div>
+        {certificates.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="ledger">
+              <thead>
+                <tr>
+                  <th>Number</th>
+                  <th>Recipient</th>
+                  <th>Type</th>
+                  <th>Validity</th>
+                  <th>Email</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
                 {certificates.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50/50 transition">
-                    <td className="py-3 px-4 font-mono text-xs font-semibold text-slate-900">{c.certificateNumber}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{c.participantName}</td>
-                    <td className="py-3 px-4 text-slate-500 text-xs">{c.recipientEmail}</td>
-                    <td className="py-3 px-4 text-slate-700 text-xs">{c.certificateType}</td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        c.status === 'VALID' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                        c.status === 'REVOKED' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
-                        'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {c.status}
-                      </span>
+                  <tr key={c.id}>
+                    <td className="num whitespace-nowrap text-[12px] font-medium text-ink">{c.certificateNumber}</td>
+                    <td className="min-w-[160px]">
+                      <span className="font-medium text-ink">{c.participantName}</span>
+                      <p className="text-[12px] text-ink-500">{c.recipientEmail}</p>
                     </td>
-                    <td className="py-3 px-4 text-xs">
-                      <span className={`font-semibold ${c.emailStatus === 'SENT' ? 'text-emerald-600' : 'text-slate-500'}`}>
-                        {c.emailStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right flex items-center justify-end gap-1.5">
-                      <a
-                        href={`/verify/${c.verificationToken}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Verify Publicly"
-                        className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                      <a
-                        href={`/api/v1/certificates/${c.id}/download`}
-                        title="Download PDF"
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </a>
-                      <button
-                        onClick={() => handleResend(c.id)}
-                        title="Resend Email"
-                        className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-slate-100 rounded-lg transition"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                      {c.status === 'VALID' && (
-                        <button
-                          onClick={() => {
-                            setSelectedCertId(c.id);
-                            setRevokeModalOpen(true);
-                          }}
-                          title="Revoke Certificate"
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition"
-                        >
-                          <Ban className="w-3.5 h-3.5" />
+                    <td className="text-[12px]">{c.certificateType}</td>
+                    <td><StatusStamp status={c.status} /></td>
+                    <td><StatusStamp status={c.emailStatus} /></td>
+                    <td>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <Link to={`/verify/${c.verificationToken}`} className="btn-icon" title="View verification page" aria-label={`View verification page for ${c.certificateNumber}`}>
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                        <button type="button" onClick={() => handleDownload(c.id)} className="btn-icon" title="Download PDF" aria-label={`Download PDF for ${c.certificateNumber}`}>
+                          <Download className="h-4 w-4" />
                         </button>
-                      )}
+                        <button type="button" onClick={() => handleResend(c.id)} className="btn-icon" title="Resend email" aria-label={`Resend email for ${c.certificateNumber}`}>
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                        {c.status === 'VALID' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCertId(c.id);
+                              setRevokeError('');
+                              setRevokeModalOpen(true);
+                            }}
+                            className="btn-icon text-bad-700"
+                            title="Revoke certificate"
+                            aria-label={`Revoke ${c.certificateNumber}`}
+                          >
+                            <Ban className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          ) : (
-            <div className="p-8 text-center text-slate-400 text-xs">
-              No certificates generated yet for this event.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Revocation Modal */}
-      {revokeModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Revoke Certificate</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Revoking a certificate immediately evicts it from the public verification cache and flags it as invalid.
-            </p>
-            <form onSubmit={handleRevoke}>
-              <div className="mb-4">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Revocation</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="e.g. Disqualified for rule infringement, issued in error..."
-                  value={revokeReason}
-                  onChange={(e) => setRevokeReason(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRevokeModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={revoking}
-                  className="px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 disabled:opacity-50"
-                >
-                  {revoking ? 'Revoking...' : 'Confirm Revocation'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+        ) : (
+          <EmptyState title="No certificates yet" description="Certificates appear here as soon as a batch generates them." />
+        )}
+      </section>
+
+      <Modal
+        open={revokeModalOpen}
+        onClose={closeRevoke}
+        title="Revoke certificate"
+        description="Revoking removes the certificate from the public verification cache and marks it invalid."
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={closeRevoke}>Cancel</button>
+            <button type="submit" form="revoke-form" className="btn-danger" disabled={revoking}>
+              {revoking ? 'Revoking' : 'Confirm revocation'}
+            </button>
+          </>
+        }
+      >
+        <form id="revoke-form" onSubmit={handleRevoke} className="space-y-3">
+          {revokeError && <div className="alert-error" role="alert">{revokeError}</div>}
+          <div>
+            <label htmlFor="revoke-reason" className="label">Reason for revocation</label>
+            <textarea
+              id="revoke-reason"
+              required
+              rows={3}
+              placeholder="Issued in error, or disqualified for a rule violation"
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+              className="input h-auto py-2"
+            />
+            <p className="hint">The reason is stored with the revocation record.</p>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

@@ -1,3 +1,4 @@
+import { store } from '../lib/storage';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/client';
 
@@ -30,7 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('certflow_token'));
+  const [token, setToken] = useState<string | null>(store.getItem('certflow_token'));
   const [activeOrg, setActiveOrg] = useState<OrgMembership | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -41,13 +42,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userData: User = res.data.data;
         setUser(userData);
         if (userData.organizations && userData.organizations.length > 0) {
-          const savedOrgId = localStorage.getItem('certflow_active_org');
+          const savedOrgId = store.getItem('certflow_active_org');
           const matched = userData.organizations.find((o) => o.organizationId === savedOrgId);
           setActiveOrg(matched || userData.organizations[0]);
         }
       }
     } catch {
-      localStorage.removeItem('certflow_token');
+      store.removeItem('certflow_token');
       setToken(null);
       setUser(null);
       setActiveOrg(null);
@@ -65,18 +66,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token]);
 
   const login = (newToken: string, newUser: User) => {
-    localStorage.setItem('certflow_token', newToken);
+    store.setItem('certflow_token', newToken);
     setToken(newToken);
     setUser(newUser);
     if (newUser.organizations && newUser.organizations.length > 0) {
       setActiveOrg(newUser.organizations[0]);
-      localStorage.setItem('certflow_active_org', newUser.organizations[0].organizationId);
+      store.setItem('certflow_active_org', newUser.organizations[0].organizationId);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('certflow_token');
-    localStorage.removeItem('certflow_active_org');
+    store.removeItem('certflow_token');
+    store.removeItem('certflow_active_org');
     setToken(null);
     setUser(null);
     setActiveOrg(null);
@@ -85,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchOrg = (org: OrgMembership) => {
     setActiveOrg(org);
-    localStorage.setItem('certflow_active_org', org.organizationId);
+    store.setItem('certflow_active_org', org.organizationId);
   };
 
   return (

@@ -1,17 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import {
-  Award,
-  Search,
-  Download,
-  RotateCcw,
-  Ban,
-  ExternalLink,
-  Repeat,
-  CheckCircle2,
-  AlertCircle
-} from 'lucide-react';
+import { Search, Download, RotateCcw, Ban, Repeat, Eye, ShieldCheck, Copy, Check } from 'lucide-react';
+import { PageHeader, StatusStamp, EmptyState, PageLoading, Modal, formatWhen } from '../components/ui';
+import { CertificateCanvas } from '../components/CertificateCanvas';
+import { downloadCertificate, verifyAbsoluteUrl } from '../lib/links';
 
 export const Certificates: React.FC = () => {
   const { activeOrg } = useAuth();
@@ -20,16 +14,25 @@ export const Certificates: React.FC = () => {
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   // Modals state
   const [revokeModalOpen, setRevokeModalOpen] = useState(false);
   const [replaceModalOpen, setReplaceModalOpen] = useState(false);
+  const [viewCert, setViewCert] = useState<any>(null);
   const [activeCert, setActiveCert] = useState<any>(null);
   const [revokeReason, setRevokeReason] = useState('');
   const [replaceReason, setReplaceReason] = useState('');
   const [replaceName, setReplaceName] = useState('');
   const [replaceEmail, setReplaceEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // View modal state
+  const templateCache = useRef<Record<string, any[]>>({});
+  const [viewTemplate, setViewTemplate] = useState<any>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -73,13 +76,17 @@ export const Certificates: React.FC = () => {
     e.preventDefault();
     if (!activeCert || !revokeReason.trim()) return;
     setSubmitting(true);
+    setModalError('');
     try {
       await api.post(`/certificates/${activeCert.id}/revoke`, { reason: revokeReason.trim() });
       setRevokeModalOpen(false);
       setRevokeReason('');
+      setNotice({ kind: 'ok', text: `Certificate ${activeCert.certificateNumber} is now revoked.` });
       fetchCertificates();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Revocation failed');
+      setModalError(
+        err.response?.data?.message || 'The certificate was not revoked. Check your connection and try again.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -89,6 +96,7 @@ export const Certificates: React.FC = () => {
     e.preventDefault();
     if (!activeCert || !replaceReason.trim()) return;
     setSubmitting(true);
+    setModalError('');
     try {
       await api.post(`/certificates/${activeCert.id}/replace`, {
         updatedParticipantName: replaceName.trim(),
@@ -99,50 +107,129 @@ export const Certificates: React.FC = () => {
       setReplaceReason('');
       setReplaceName('');
       setReplaceEmail('');
+      setNotice({ kind: 'ok', text: `A replacement for ${activeCert.certificateNumber} was issued.` });
       fetchCertificates();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Replacement failed');
+      setModalError(
+        err.response?.data?.message || 'The replacement was not issued. Check the name and email, then try again.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleResend = async (certId: string) => {
+    setNotice(null);
     try {
       const res = await api.post(`/certificates/${certId}/resend`);
-      alert(res.data?.message || 'Certificate email re-sent successfully!');
+      setNotice({ kind: 'ok', text: res.data?.message || 'The certificate email was sent again.' });
       fetchCertificates();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to resend email');
+      setNotice({
+        kind: 'error',
+        text: err.response?.data?.message || 'The email was not sent. Check the recipient address and try again.',
+      });
       fetchCertificates();
     }
   };
 
+  const handleDownload = async (certId: string) => {
+    setNotice(null);
+    try {
+      await downloadCertificate(certId);
+    } catch (err: any) {
+      setNotice({
+        kind: 'error',
+        text: err?.response?.data?.message || 'The PDF could not be downloaded. Try again in a moment.',
+      });
+    }
+  };
+
+  const openView = async (c: any) => {
+    setViewCert(c);
+    setViewTemplate(null);
+    setCopied(false);
+    const eventId = c.eventId || selectedEventId;
+    if (!eventId) return;
+    setViewLoading(true);
+    try {
+      let list = templateCache.current[eventId];
+      if (!list) {
+        const res = await api.get(`/events/${eventId}/templates`);
+        list = Array.isArray(res.data?.data) ? res.data.data : [];
+        templateCache.current[eventId] = list;
+      }
+      const tpl = list.find((t) => t.id === c.templateId) || list[0] || null;
+      setViewTemplate(tpl);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const copyToken = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const q = search.toLowerCase();
   const filtered = certificates.filter(
     (c) =>
-      c.participantName.toLowerCase().includes(search.toLowerCase()) ||
-      c.recipientEmail.toLowerCase().includes(search.toLowerCase()) ||
-      c.certificateNumber.toLowerCase().includes(search.toLowerCase())
+      c.participantName.toLowerCase().includes(q) ||
+      c.recipientEmail.toLowerCase().includes(q) ||
+      c.certificateNumber.toLowerCase().includes(q)
   );
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Certificate Registry</h1>
-          <p className="text-xs text-slate-500">
-            Search, download, revoke, replace, and resend generated certificates.
-          </p>
-        </div>
+  const eventName = (c: any) => c.eventName || events.find((e) => e.id === (c.eventId || selectedEventId))?.name || '';
+  const formatDate = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+      ? iso
+      : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
 
-        {events.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Filter Event:</span>
+  const closeRevoke = () => {
+    setRevokeModalOpen(false);
+    setModalError('');
+  };
+  const closeReplace = () => {
+    setReplaceModalOpen(false);
+    setModalError('');
+  };
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Registry"
+        title="Certificates"
+        description="Find any issued certificate, view it, download the PDF, resend the email, replace it or revoke it."
+      />
+
+      {notice && (
+        <div className={`mb-4 ${notice.kind === 'ok' ? 'alert-ok' : 'alert-error'}`} role="status">
+          {notice.text}
+        </div>
+      )}
+
+      <section className="panel mb-5">
+        <div className="panel-body grid gap-3 sm:grid-cols-[minmax(0,16rem)_1fr]">
+          <div>
+            <label htmlFor="cert-event" className="label">Event</label>
             <select
+              id="cert-event"
+              className="input"
               value={selectedEventId}
               onChange={(e) => setSelectedEventId(e.target.value)}
-              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white font-medium"
+              disabled={events.length === 0}
             >
+              {events.length === 0 && <option value="">No events yet</option>}
               {events.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name}
@@ -150,250 +237,285 @@ export const Certificates: React.FC = () => {
               ))}
             </select>
           </div>
-        )}
-      </div>
-
-      {/* Filter / Search Bar */}
-      <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-        <input
-          type="text"
-          placeholder="Search by participant name, email, or certificate ID..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 shadow-sm"
-        />
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        {loading ? (
-          <div className="h-48 flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+          <div>
+            <label htmlFor="cert-search" className="label">Search</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+              <input
+                id="cert-search"
+                type="search"
+                className="input pl-9"
+                placeholder="Name, email or certificate number"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
+        </div>
+      </section>
+
+      <section className="panel overflow-hidden">
+        {loading ? (
+          <PageLoading label="Loading certificates" />
         ) : filtered.length > 0 ? (
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-semibold">
-                <th className="py-3 px-4">Certificate ID</th>
-                <th className="py-3 px-4">Participant</th>
-                <th className="py-3 px-4">Email</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Validity</th>
-                <th className="py-3 px-4">Email Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-50/50 transition">
-                  <td className="py-3 px-4 font-mono font-semibold text-slate-900">{c.certificateNumber}</td>
-                  <td className="py-3 px-4 font-semibold text-slate-800">{c.participantName}</td>
-                  <td className="py-3 px-4 text-slate-500 font-mono">{c.recipientEmail}</td>
-                  <td className="py-3 px-4 text-slate-700">{c.certificateType}</td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        c.status === 'VALID'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : c.status === 'REVOKED'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex flex-col gap-1 items-start">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          c.emailStatus === 'SENT'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : c.emailStatus === 'FAILED'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200 font-bold'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {c.emailStatus === 'SENT' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
-                        {c.emailStatus === 'FAILED' && <AlertCircle className="w-3 h-3 text-rose-600" />}
-                        {c.emailStatus}
-                      </span>
+          <div className="overflow-x-auto">
+            <table className="ledger w-full">
+              <thead>
+                <tr>
+                  <th>Number</th>
+                  <th>Recipient</th>
+                  <th>Event</th>
+                  <th>Status</th>
+                  <th>Email</th>
+                  <th>Issued</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((c) => (
+                  <tr key={c.id}>
+                    <td className="whitespace-nowrap font-mono text-[12px] font-medium text-ink">{c.certificateNumber}</td>
+                    <td>
+                      <p className="font-medium text-ink">{c.participantName}</p>
+                      <p className="font-mono text-[11px] text-ink-500">{c.recipientEmail}</p>
+                    </td>
+                    <td className="text-ink-600">{eventName(c) || '-'}</td>
+                    <td>
+                      <StatusStamp status={c.status} />
+                    </td>
+                    <td>
+                      <StatusStamp status={c.emailStatus} />
                       {c.emailStatus === 'FAILED' && c.emailErrorMessage && (
-                        <p className="text-[10px] text-rose-600 font-medium max-w-[220px] leading-tight" title={c.emailErrorMessage}>
+                        <p className="mt-1 max-w-[220px] text-[11px] leading-tight text-bad-700" title={c.emailErrorMessage}>
                           {c.emailErrorMessage}
                         </p>
                       )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <a
-                        href={`/verify/${c.verificationToken}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Open Public Verification"
-                        className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                      <a
-                        href={`/api/v1/certificates/${c.id}/download`}
-                        title="Download PDF"
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </a>
-                      <button
-                        onClick={() => handleResend(c.id)}
-                        title="Resend Email"
-                        className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-slate-100 rounded-lg transition"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                      {c.status === 'VALID' && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setActiveCert(c);
-                              setReplaceName(c.participantName);
-                              setReplaceEmail(c.recipientEmail);
-                              setReplaceModalOpen(true);
-                            }}
-                            title="Issue Replacement"
-                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded-lg transition"
-                          >
-                            <Repeat className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setActiveCert(c);
-                              setRevokeModalOpen(true);
-                            }}
-                            title="Revoke Certificate"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition"
-                          >
-                            <Ban className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="whitespace-nowrap font-mono text-[12px] text-ink-500">
+                      {formatWhen(c.issueDate || c.createdAt)}
+                    </td>
+                    <td>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button type="button" className="btn-icon" title="View certificate" aria-label={`View certificate ${c.certificateNumber}`} onClick={() => openView(c)}>
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <Link to={`/verify/${c.verificationToken}`} className="btn-icon" title="Open verification page" aria-label={`Open verification page for ${c.certificateNumber}`}>
+                          <ShieldCheck className="h-4 w-4" />
+                        </Link>
+                        <button type="button" className="btn-icon" title="Download PDF" aria-label={`Download PDF for ${c.certificateNumber}`} onClick={() => handleDownload(c.id)}>
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button type="button" className="btn-icon" title="Resend email" aria-label={`Resend email for ${c.certificateNumber}`} onClick={() => handleResend(c.id)}>
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                        {c.status === 'VALID' && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              title="Issue replacement"
+                              aria-label={`Issue replacement for ${c.certificateNumber}`}
+                              onClick={() => {
+                                setActiveCert(c);
+                                setReplaceName(c.participantName);
+                                setReplaceEmail(c.recipientEmail);
+                                setModalError('');
+                                setReplaceModalOpen(true);
+                              }}
+                            >
+                              <Repeat className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-icon text-bad-700"
+                              title="Revoke certificate"
+                              aria-label={`Revoke certificate ${c.certificateNumber}`}
+                              onClick={() => {
+                                setActiveCert(c);
+                                setModalError('');
+                                setRevokeModalOpen(true);
+                              }}
+                            >
+                              <Ban className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <div className="p-12 text-center text-slate-400 text-xs">
-            No certificates found matching your criteria.
+          <EmptyState
+            title={certificates.length === 0 ? 'No certificates issued yet' : 'No certificates match your search'}
+            description={
+              certificates.length === 0
+                ? 'Certificates appear here after you run a batch for this event.'
+                : 'Check the spelling, or clear the search box to see every certificate for this event.'
+            }
+          />
+        )}
+      </section>
+
+      {/* View modal */}
+      <Modal
+        open={!!viewCert}
+        onClose={() => setViewCert(null)}
+        title={viewCert ? `Certificate ${viewCert.certificateNumber}` : 'Certificate'}
+        description={viewCert ? `Issued to ${viewCert.participantName}` : undefined}
+        width="max-w-3xl"
+        footer={
+          viewCert && (
+            <>
+              <button type="button" className="btn-secondary" onClick={() => handleDownload(viewCert.id)}>
+                <Download className="h-4 w-4" /> Download PDF
+              </button>
+              <button type="button" className="btn-dark" onClick={() => setViewCert(null)}>
+                Close
+              </button>
+            </>
+          )
+        }
+      >
+        {viewCert && (
+          <div className="space-y-4">
+            {viewLoading ? (
+              <PageLoading label="Loading template" />
+            ) : (
+              <div className="relative overflow-hidden border border-paper-300 bg-white">
+                <CertificateCanvas
+                  layout={viewTemplate?.layoutConfig}
+                  values={{
+                    participant_name: viewCert.participantName,
+                    event_name: eventName(viewCert),
+                    organization_name: viewCert.organizationName || activeOrg?.organizationName || '',
+                    certificate_type: viewCert.certificateType || '',
+                    issue_date: formatDate(viewCert.issueDate || viewCert.createdAt),
+                    certificate_number: viewCert.certificateNumber,
+                  }}
+                  verifyUrl={verifyAbsoluteUrl(viewCert.verificationToken)}
+                  backgroundUrl={viewTemplate?.backgroundUrl}
+                  className="w-full"
+                />
+                {viewCert.status === 'REVOKED' && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden="true">
+                    <span className="-rotate-12 border-4 border-bad-500/40 px-6 py-2 font-display text-5xl font-bold uppercase tracking-widest text-bad-500/40 sm:text-7xl">
+                      Revoked
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            <dl className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <dt className="eyebrow mb-1">Certificate number</dt>
+                <dd className="font-mono text-[13px] text-ink">{viewCert.certificateNumber}</dd>
+              </div>
+              <div>
+                <dt className="eyebrow mb-1">Status</dt>
+                <dd className="flex flex-wrap gap-1.5">
+                  <StatusStamp status={viewCert.status} />
+                  <StatusStamp status={viewCert.emailStatus} />
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="eyebrow mb-1">Verification token</dt>
+                <dd className="flex items-center gap-1">
+                  <span className="truncate font-mono text-[12px] text-ink-600">{viewCert.verificationToken}</span>
+                  <button
+                    type="button"
+                    className="btn-icon shrink-0"
+                    title="Copy token"
+                    aria-label="Copy verification token"
+                    onClick={() => copyToken(viewCert.verificationToken)}
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </dd>
+              </div>
+            </dl>
           </div>
         )}
-      </div>
+      </Modal>
 
       {/* Revocation Modal */}
-      {revokeModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Revoke Certificate</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Revoking certificate <code>{activeCert?.certificateNumber}</code> will permanently mark it as revoked and bust the verification cache.
-            </p>
-            <form onSubmit={handleRevoke}>
-              <div className="mb-4">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Revocation</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="e.g. Identity discrepancy, award rescinded..."
-                  value={revokeReason}
-                  onChange={(e) => setRevokeReason(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRevokeModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 disabled:opacity-50"
-                >
-                  {submitting ? 'Revoking...' : 'Confirm Revocation'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={revokeModalOpen}
+        onClose={closeRevoke}
+        title="Revoke certificate"
+        description={`Revoking ${activeCert?.certificateNumber ?? ''} marks it as revoked on its public verification page. This cannot be undone.`}
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={closeRevoke}>
+              Cancel
+            </button>
+            <button type="submit" form="revoke-form" className="btn-danger" disabled={submitting || !revokeReason.trim()}>
+              {submitting ? 'Revoking' : 'Revoke certificate'}
+            </button>
+          </>
+        }
+      >
+        <form id="revoke-form" onSubmit={handleRevoke} className="space-y-3">
+          {modalError && <div className="alert-error" role="alert">{modalError}</div>}
+          <div>
+            <label htmlFor="revoke-reason" className="label">Reason for revocation</label>
+            <textarea
+              id="revoke-reason"
+              required
+              rows={3}
+              className="input"
+              placeholder="Example: award rescinded after review"
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+            />
+            <p className="hint">The reason is saved in the audit log.</p>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* Replacement Modal */}
-      {replaceModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Issue Replacement Certificate</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Preserves historical audit records and issues a new valid certificate linked to <code>{activeCert?.certificateNumber}</code>.
-            </p>
-            <form onSubmit={handleReplace} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Corrected Participant Name</label>
-                <input
-                  type="text"
-                  required
-                  value={replaceName}
-                  onChange={(e) => setReplaceName(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Corrected Email</label>
-                <input
-                  type="email"
-                  required
-                  value={replaceEmail}
-                  onChange={(e) => setReplaceEmail(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Replacement</label>
-                <textarea
-                  required
-                  rows={2}
-                  placeholder="e.g. Spelling correction in recipient name..."
-                  value={replaceReason}
-                  onChange={(e) => setReplaceReason(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setReplaceModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-700 disabled:opacity-50"
-                >
-                  {submitting ? 'Issuing...' : 'Issue Replacement'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={replaceModalOpen}
+        onClose={closeReplace}
+        title="Issue replacement"
+        description={`Issues a new valid certificate linked to ${activeCert?.certificateNumber ?? ''}. The original stays in the audit history.`}
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={closeReplace}>
+              Cancel
+            </button>
+            <button type="submit" form="replace-form" className="btn-primary" disabled={submitting}>
+              {submitting ? 'Issuing' : 'Issue replacement'}
+            </button>
+          </>
+        }
+      >
+        <form id="replace-form" onSubmit={handleReplace} className="space-y-3">
+          {modalError && <div className="alert-error" role="alert">{modalError}</div>}
+          <div>
+            <label htmlFor="replace-name" className="label">Corrected participant name</label>
+            <input id="replace-name" type="text" required className="input" value={replaceName} onChange={(e) => setReplaceName(e.target.value)} />
           </div>
-        </div>
-      )}
+          <div>
+            <label htmlFor="replace-email" className="label">Corrected email</label>
+            <input id="replace-email" type="email" required className="input" value={replaceEmail} onChange={(e) => setReplaceEmail(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="replace-reason" className="label">Reason for replacement</label>
+            <textarea
+              id="replace-reason"
+              required
+              rows={2}
+              className="input"
+              placeholder="Example: spelling correction in the recipient name"
+              value={replaceReason}
+              onChange={(e) => setReplaceReason(e.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

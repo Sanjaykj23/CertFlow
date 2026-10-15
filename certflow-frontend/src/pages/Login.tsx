@@ -2,13 +2,55 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
-import { Award, Lock, Mail, ArrowRight } from 'lucide-react';
+import { isDemo } from '../lib/env';
+import { Logo, Seal, Modal } from '../components/ui';
+import { ArrowRight, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+
+const STEPS = [
+  { n: '01', title: 'Import roster', body: 'Upload a CSV of recipients and map the columns.' },
+  { n: '02', title: 'Render and deliver', body: 'Each certificate is drawn from your layout and emailed.' },
+  { n: '03', title: 'Verify by QR', body: 'Anyone who scans the code sees the public record.' },
+];
+
+/** Shared two-panel shell used by Login and Register. */
+export const AuthShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex min-h-screen flex-col bg-paper lg:flex-row">
+    <aside className="guilloche relative bg-ink text-white lg:flex lg:w-[44%] lg:max-w-[600px] lg:flex-col lg:justify-between lg:px-12 lg:py-12">
+      <div className="flex items-center justify-between px-4 py-4 sm:px-8 lg:p-0">
+        <Logo inverted />
+        <span className="eyebrow !text-ink-300 lg:hidden">Certificates, verified</span>
+      </div>
+      <div className="hidden lg:block">
+        <Seal size={96} tone="foil" />
+        <h1 className="mt-8 max-w-sm font-display text-[34px] font-semibold leading-[1.1] tracking-tight text-white">
+          Issue certificates in bulk. Let anyone verify them in seconds.
+        </h1>
+        <ol className="mt-10 space-y-5">
+          {STEPS.map((s) => (
+            <li key={s.n} className="flex gap-4">
+              <span className="num pt-0.5 text-[12px] text-foil-400">{s.n}</span>
+              <div>
+                <p className="font-display text-[15px] font-semibold">{s.title}</p>
+                <p className="mt-0.5 text-[13px] text-ink-300">{s.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <p className="eyebrow hidden !text-ink-400 lg:block">How a certificate travels</p>
+    </aside>
+    <main className="flex flex-1 items-start justify-center px-4 py-8 sm:px-8 lg:items-center lg:py-12">
+      <div className="w-full max-w-[420px]">{children}</div>
+    </main>
+  </div>
+);
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetDone, setResetDone] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -22,6 +64,7 @@ export const Login: React.FC = () => {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState<string | null>(null);
   const [forgotErr, setForgotErr] = useState<string | null>(null);
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,11 +72,12 @@ export const Login: React.FC = () => {
     setForgotMsg(null);
     setForgotLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email: forgotEmail.trim() });
+      const res = await api.post('/auth/forgot-password', { email: forgotEmail.trim() });
       setForgotMsg(`A 6-digit reset code was sent to ${forgotEmail}. Please check your inbox.`);
+      setDemoOtp(res.data?.data?.demoOtp ? '123456' : null);
       setForgotStep('VERIFY');
     } catch (err: any) {
-      setForgotErr(err.response?.data?.message || 'Failed to send reset code. Please verify your email.');
+      setForgotErr(err.response?.data?.message || 'Failed to send reset code. Check the email address and try again.');
     } finally {
       setForgotLoading(false);
     }
@@ -50,12 +94,12 @@ export const Login: React.FC = () => {
         otp: forgotOtp.trim(),
         newPassword: forgotNewPass,
       });
-      alert('Password updated successfully! You can now log in with your new password.');
+      setResetDone(true);
       setShowForgotModal(false);
       setForgotStep('REQUEST');
       setEmail(forgotEmail);
     } catch (err: any) {
-      setForgotErr(err.response?.data?.message || 'Invalid or expired reset code.');
+      setForgotErr(err.response?.data?.message || 'The reset code is invalid or expired. Request a new code and try again.');
     } finally {
       setForgotLoading(false);
     }
@@ -64,6 +108,7 @@ export const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setResetDone(false);
     setLoading(true);
 
     try {
@@ -73,189 +118,207 @@ export const Login: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+      setError(err.response?.data?.message || 'Invalid email or password. Check both and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="w-12 h-12 bg-gradient-to-tr from-brand-600 to-sky-400 rounded-xl mx-auto flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
-          <Award className="w-6 h-6" />
+    <AuthShell>
+      <p className="eyebrow mb-2">Sign in</p>
+      <h2 className="page-title">Welcome back</h2>
+      <p className="page-lead">Sign in to manage events, rosters and issued certificates.</p>
+
+      {isDemo && (
+        <div className="panel-muted mt-6 p-4">
+          <p className="eyebrow">Demo account</p>
+          <dl className="mt-2 space-y-1 text-[13px]">
+            <div className="flex gap-2">
+              <dt className="w-16 text-ink-500">Email</dt>
+              <dd className="num break-all text-ink">demo@certflow.dev</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-16 text-ink-500">Password</dt>
+              <dd className="num text-ink">Demo@1234</dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            className="btn-secondary btn-sm mt-3"
+            onClick={() => {
+              setEmail('demo@certflow.dev');
+              setPassword('Demo@1234');
+            }}
+          >
+            Fill in demo credentials
+          </button>
         </div>
-        <h2 className="mt-4 text-3xl font-extrabold text-white tracking-tight">CertFlow</h2>
-        <p className="mt-1 text-sm text-slate-400">Distributed Certificate Generation & Delivery Platform</p>
-      </div>
+      )}
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-slate-800/80 border border-slate-700/80 backdrop-blur-sm py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            {error && (
-              <div className="p-3 bg-red-950/60 border border-red-800/60 rounded-xl text-red-300 text-xs font-medium">
-                {error}
-              </div>
-            )}
+      <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+        {resetDone && (
+          <div className="alert-ok" role="status">
+            <CheckCircle2 className="mt-px h-4 w-4 shrink-0" />
+            <span>Password updated. Sign in with your new password.</span>
+          </div>
+        )}
+        {error && (
+          <div className="alert-error" role="alert">
+            <AlertCircle className="mt-px h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Work Email</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="email"
-                  required
-                  placeholder="organizer@college.edu"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                />
-              </div>
-            </div>
+        <div>
+          <label htmlFor="login-email" className="label">Work email</label>
+          <input
+            id="login-email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="organizer@college.edu"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input"
+          />
+        </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowForgotModal(true)}
-                className="text-xs text-sky-400 hover:text-sky-300 font-medium cursor-pointer"
-              >
-                Forgot Password?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-brand-600 to-sky-500 text-white text-sm font-semibold rounded-xl hover:from-brand-500 hover:to-sky-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 cursor-pointer"
-            >
-              {loading ? 'Authenticating...' : 'Sign in to Dashboard'}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </form>
-
-          <div className="mt-4 pt-4 border-t border-slate-700/60 flex items-center justify-between text-xs">
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label htmlFor="login-password" className="!mb-0 label">Password</label>
             <button
               type="button"
-              onClick={() => {
-                setEmail('admin@certflow.io');
-                setPassword('Password123!');
-              }}
-              className="text-sky-400 hover:text-sky-300 font-medium hover:underline cursor-pointer"
+              onClick={() => setShowForgotModal(true)}
+              className="rounded text-[12px] font-semibold text-seal-700 hover:underline"
             >
-              ⚡ Fill Demo Login (admin@certflow.io)
+              Forgot password?
             </button>
-            <Link to="/register" className="font-semibold text-sky-400 hover:text-sky-300 underline underline-offset-2">
-              Register here
-            </Link>
           </div>
+          <input
+            id="login-password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input"
+          />
         </div>
-      </div>
 
-      {/* Forgot Password Modal */}
-      {showForgotModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white">Reset Password</h3>
-            <p className="text-xs text-slate-400">
-              {forgotStep === 'REQUEST'
-                ? 'Enter your account email to receive a 6-digit reset code.'
-                : `Enter the 6-digit code sent to ${forgotEmail} along with your new password.`}
-            </p>
+        <button type="submit" disabled={loading} className="btn-primary h-10 w-full">
+          {loading ? 'Signing in...' : 'Sign in'}
+          {!loading && <ArrowRight className="h-4 w-4" />}
+        </button>
+      </form>
 
-            {forgotMsg && (
-              <div className="p-3 bg-emerald-950/60 border border-emerald-800/60 rounded-xl text-emerald-300 text-xs">
-                {forgotMsg}
-              </div>
-            )}
-            {forgotErr && (
-              <div className="p-3 bg-red-950/60 border border-red-800/60 rounded-xl text-red-300 text-xs">
-                {forgotErr}
-              </div>
-            )}
+      <p className="mt-6 text-[13px] text-ink-500">
+        New to CertFlow?{' '}
+        <Link to="/register" className="rounded font-semibold text-seal-700 hover:underline">
+          Create an account
+        </Link>
+      </p>
 
-            {forgotStep === 'REQUEST' ? (
-              <form onSubmit={handleRequestReset} className="space-y-4">
+      <Modal
+        open={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        title="Reset password"
+        description={
+          forgotStep === 'REQUEST'
+            ? 'Enter your account email to receive a 6-digit reset code.'
+            : `Enter the 6-digit code sent to ${forgotEmail} and choose a new password.`
+        }
+      >
+        <div className="space-y-3">
+          {forgotMsg && (
+            <div className="alert-ok" role="status">
+              <CheckCircle2 className="mt-px h-4 w-4 shrink-0" />
+              <span>{forgotMsg}</span>
+            </div>
+          )}
+          {forgotErr && (
+            <div className="alert-error" role="alert">
+              <AlertCircle className="mt-px h-4 w-4 shrink-0" />
+              <span>{forgotErr}</span>
+            </div>
+          )}
+
+          {forgotStep === 'REQUEST' ? (
+            <form onSubmit={handleRequestReset} className="space-y-4">
+              <div>
+                <label htmlFor="forgot-email" className="label">Account email</label>
                 <input
+                  id="forgot-email"
                   type="email"
                   required
-                  placeholder="Enter your account email"
+                  autoComplete="email"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="input"
                 />
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotModal(false)}
-                    className="px-4 py-2 bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-600 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-semibold hover:bg-brand-500 cursor-pointer"
-                  >
-                    {forgotLoading ? 'Sending...' : 'Send Reset Code'}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowForgotModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={forgotLoading} className="btn-primary">
+                  {forgotLoading ? 'Sending...' : 'Send reset code'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleConfirmReset} className="space-y-4">
+              {demoOtp && (
+                <div className="alert-info items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Info className="h-4 w-4 shrink-0" />
+                    Demo code: <span className="num font-semibold">{demoOtp}</span>
+                  </span>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => setForgotOtp(demoOtp)}>
+                    Use this code
                   </button>
                 </div>
-              </form>
-            ) : (
-              <form onSubmit={handleConfirmReset} className="space-y-3">
+              )}
+              <div>
+                <label htmlFor="forgot-otp" className="label">6-digit code</label>
                 <input
+                  id="forgot-otp"
                   type="text"
+                  inputMode="numeric"
                   required
                   maxLength={6}
-                  placeholder="6-Digit OTP Code"
+                  autoComplete="one-time-code"
                   value={forgotOtp}
                   onChange={(e) => setForgotOtp(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-center font-mono tracking-widest text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="input num tracking-[0.3em]"
                 />
+              </div>
+              <div>
+                <label htmlFor="forgot-new" className="label">New password</label>
                 <input
+                  id="forgot-new"
                   type="password"
                   required
                   minLength={8}
-                  placeholder="New Password (min 8 chars)"
+                  autoComplete="new-password"
                   value={forgotNewPass}
                   onChange={(e) => setForgotNewPass(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="input"
                 />
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setForgotStep('REQUEST')}
-                    className="px-4 py-2 bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-600 cursor-pointer"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-500 cursor-pointer"
-                  >
-                    {forgotLoading ? 'Updating...' : 'Set New Password'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+                <p className="hint">Use at least 8 characters.</p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setForgotStep('REQUEST')} className="btn-secondary">
+                  Back
+                </button>
+                <button type="submit" disabled={forgotLoading} className="btn-primary">
+                  {forgotLoading ? 'Updating...' : 'Set new password'}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
-      )}
-    </div>
+      </Modal>
+    </AuthShell>
   );
 };
