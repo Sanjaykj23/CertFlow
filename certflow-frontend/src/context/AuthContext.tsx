@@ -1,5 +1,6 @@
 import { store } from '../lib/storage';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { isDemo } from '../lib/env';
 import api from '../api/client';
 
 export interface OrgMembership {
@@ -81,7 +82,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
     setUser(null);
     setActiveOrg(null);
-    window.location.href = '/login';
+    // Demo mode uses hash routing, so a hard navigation to /login would 404.
+    if (isDemo) window.location.hash = '#/login';
+    else window.location.href = '/login';
   };
 
   const switchOrg = (org: OrgMembership) => {
