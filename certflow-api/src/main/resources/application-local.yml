@@ -45,12 +45,15 @@ certflow:
     enabled: false
   redis:
     enabled: false
+  email:
+    from: ${SMTP_FROM:${SMTP_USERNAME:no-reply@certflow.io}}
+    from-name: ${SMTP_FROM_NAME:CertFlow}
   jwt:
-    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-    expiration-ms: 86400000
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   app:
-    base-url: http://localhost:5173
-    public-verify-url: http://localhost:5173/verify
+    base-url: ${APP_BASE_URL:http://localhost:5173}
+    public-verify-url: ${PUBLIC_VERIFY_BASE_URL:http://localhost:5173/verify}
 
 management:
   endpoints:

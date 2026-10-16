@@ -4,8 +4,9 @@ import { Building2, ChevronDown, LogOut, Plus, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import { Logo, Modal } from './ui';
+import { isDemo } from '../lib/env';
 
-const NAV_ITEMS = [
+const ALL_NAV_ITEMS = [
   { to: '/', label: 'Overview', end: true },
   { to: '/events', label: 'Events', end: false },
   { to: '/certificates', label: 'Certificates', end: false },
@@ -13,6 +14,9 @@ const NAV_ITEMS = [
   { to: '/members', label: 'Team', end: false },
   { to: '/audit-logs', label: 'Audit', end: false },
 ];
+
+// The Pipeline view needs the distributed (Kafka) backend, so it is demo-only.
+const NAV_ITEMS = isDemo ? ALL_NAV_ITEMS : ALL_NAV_ITEMS.filter((i) => i.to !== '/pipeline');
 
 export const Navbar: React.FC = () => {
   const { user, activeOrg, switchOrg, logout, refreshUser } = useAuth();

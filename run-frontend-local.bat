@@ -1,7 +1,5 @@
 @echo off
-echo ========================================================
-echo   Starting CertFlow React Frontend Dashboard
-echo ========================================================
-cd certflow-frontend
+cd /d "%~dp0certflow-frontend"
+if not exist node_modules call npm install
 call npm run dev
 pause
