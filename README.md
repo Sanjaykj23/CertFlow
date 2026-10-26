@@ -1,184 +1,163 @@
-# CertFlow — Distributed Certificate Generation & Verification Platform
+# CertFlow
 
-[![Java](https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat&logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-6DB33F?style=flat&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?style=flat&logo=postgresql&logoColor=white)](https://supabase.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+**Certificate generation and verification for events.** Design a certificate, upload a list of participants, and CertFlow creates a PDF for each person with a QR code, emails it from your own Gmail account, and gives anyone a public page to check that the certificate is real.
 
-**CertFlow** is an enterprise-grade, full-stack certificate infrastructure platform built for colleges, universities, hackathons, and corporate organizers. It enables teams to design templates, validate participant CSVs, generate high-resolution PDF certificates with cryptographic QR verification stamps, deliver them directly via SMTP email, and audit delivery states in real-time.
+Built with Java 17, Spring Boot 3.3, Apache PDFBox, React 18, TypeScript, Vite and Tailwind CSS.
 
 ---
 
-## Highlights & Features
+## What it does
 
-- **2-Step Registration & Password Reset**: Secure 6-digit email OTP verification via Gmail SMTP before account activation and secure password reset workflow.
-- **Dynamic Visual Template Designer**: Drag-and-drop or coordinate-based text placeholders (`{{participant_name}}`, `{{event_name}}`, `{{certificate_type}}`, `{{date}}`, `{{certificate_number}}`), custom typography, background upload, and live PDF rendering preview.
-- **Bulk CSV Import Engine**: Validates headers, verifies RFC 5322 email syntax, filters in-batch duplicates, and provides real-time row previews before issuing batches.
-- **Automated Asynchronous Processing**: Renders personalized vector-quality PDFs using Apache PDFBox 3.x, generates unique 256-bit verification tokens with ZXing QR codes, and uploads to S3/MinIO or local storage.
-- **Email Delivery & Failure Auditing**: Delivers emails with attached PDF certificates via Gmail SMTP or Mailpit, captures SMTP error codes (e.g. invalid addresses, 550 bounces, timeouts), and records every attempt in `email_delivery_attempts`.
-- **Live Batch Progress Tracking**: Real-time polling dashboard displaying completion percentages, PDFs generated, emails sent, failed deliveries, and individual participant worker logs.
-- **Public Instant Verification**: Cryptographically secure URL and QR code verification portal with sub-millisecond Redis caching and instant cache invalidation upon revocation or replacement.
-- **Dual Execution Modes**:
-  - **Zero-Docker Mode**: Runs on any workstation using Supabase Cloud PostgreSQL / embedded database and direct SMTP delivery.
-  - **Distributed Production Mode**: Microservice event pipeline powered by Kafka, Transactional Outbox pattern, Redis, and MinIO S3 object storage.
+- **Sign-up with email codes.** A 6-digit code is emailed to confirm your address. Password reset works the same way.
+- **Organizations and roles.** Owner, Admin, Operator and Viewer, with an audit log of what happened.
+- **Template editor.** A Canva-style editor: drag, resize and rotate text, shapes, lines, images and QR codes. It has layers, undo/redo, 45 fonts, colors and gradients, backgrounds, 8 starter designs, and fields like `{{participant_name}}` that fill in per person.
+- **CSV import.** Checks headers and email addresses, skips duplicates and previews rows before you send.
+- **Batch sending.** Makes a PDF per participant with a unique verification QR code, emails it as an attachment, and shows live progress. A failed email shows the exact reason and can be resent.
+- **Public verification.** Anyone can scan the QR code or open `/verify/<token>` to confirm a certificate. Revoked certificates stop verifying.
 
 ---
 
-## System Architecture
+## Quick start (Windows, no Docker)
 
-```
-                       Web Browser / Mobile Client
-                                   |
-                                   v
-             +-------------------------------------------+
-             | React 18 + TypeScript Dashboard (Port 5173)|
-             +-------------------------------------------+
-                                   | REST APIs (JWT Auth)
-                                   v
-             +-------------------------------------------+
-             | Spring Boot REST Backend (Port 8081)      |
-             |  - Auth, 2FA OTP, Orgs & Events           |
-             |  - CSV Validation & Batch Orchestration   |
-             |  - PDFBox Engine & QR Code Stamping       |
-             |  - SMTP Delivery & Failure Tracking       |
-             +-------------------------------------------+
-               /              |                        \
-              /               |                         \
-             v                v                          v
-   +------------------+  +-------------------+  +------------------+
-   | PostgreSQL DB    |  | S3 / Local Storage|  | SMTP Mail Server |
-   | (Supabase/Local) |  | (PDFs & Templates)|  | (Gmail / Mailpit)|
-   +------------------+  +-------------------+  +------------------+
-```
+You need **Java 17 or newer** and **Node.js 18 or newer**. Check with `java -version` and `node -v`.
 
----
+1. **Create your settings file.** Copy `.env.example` to `.env` in the project folder.
+2. **Add your Gmail.** Open `.env` in Notepad and set `SMTP_USERNAME`, `SMTP_FROM` (your Gmail address) and `SMTP_PASSWORD` (a Gmail App Password; see below).
+3. **Start everything.** Double-click `start-certflow.bat`. It opens a backend window and a frontend window, so keep both open. The first start downloads Maven and takes a few minutes. Wait for `Started CertFlowApiApplication` in the backend window.
+4. **Open the app** at http://localhost:5173.
 
-## Project Structure
+The simple setup stores data in a built-in H2 database (`certflow-api/data/`) and PDFs in `certflow-api/storage-data/`. You don't need to install a database, Kafka, Redis or MinIO.
 
-```
-CertFlow/
-├── certflow-api/              # Spring Boot REST API (Auth, Batches, Templates, Certificates)
-├── certflow-common/           # Shared DTOs, domain models, PDFBox renderer, QR utilities
-├── certflow-frontend/         # React 18 + TypeScript + Vite + Tailwind CSS dashboard
-├── certflow-worker-pdf/       # Distributed PDF generation worker (Kafka consumer)
-├── certflow-worker-email/     # Distributed email delivery worker (Kafka consumer + DLQ)
-├── monitoring/                # Prometheus & Grafana dashboard configurations
-├── docker-compose.yml         # Full infrastructure stack (Postgres/CockroachDB, Kafka, Redis, MinIO, Mailpit)
-├── run-backend-local.ps1      # Zero-Docker backend launcher (PowerShell)
-├── run-frontend-local.ps1     # Frontend launcher (PowerShell)
-├── pom.xml                    # Root Maven multi-module configuration
-└── sample-participants.csv    # Sample CSV for testing batch issuance
-```
+### Get a Gmail App Password
+
+Gmail doesn't accept your normal password for apps.
+
+1. Turn on **2-Step Verification**: https://myaccount.google.com/security
+2. Create an **App Password**: https://myaccount.google.com/apppasswords
+3. Paste the 16 characters into `SMTP_PASSWORD` in `.env`.
+
+A normal Gmail account can send about **500 emails a day**. Certificates are sent from your address, so recipients see you as the sender.
+
+### Try it end to end
+
+1. Create an account. The code arrives by email. If email isn't working, the code is also printed in the backend window as `[DEV / FALLBACK] Verification OTP`.
+2. Create an event, then open **Template builder**, design a certificate and save.
+3. Upload a CSV with the headers shown in `sample-participants.csv`. **Use your own email address first** to test.
+4. Launch the batch and watch the progress. The certificate PDF arrives by email.
 
 ---
 
-## Quickstart Guide
+## Configuration (`.env`)
 
-### Prerequisites
-- **Java**: JDK 17 or higher
-- **Node.js**: v18+ and npm
-- **Database**: Supabase PostgreSQL account (or local PostgreSQL / Docker)
-- **SMTP**: Gmail account with App Password (or local Mailpit)
+Every setting has an explanation in [`.env.example`](.env.example). The main ones:
+
+| Setting | What it does |
+|---|---|
+| `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_DRIVER` | Database. Default: embedded H2. PostgreSQL / Supabase also works. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | Mail server. Default: Gmail on port 587. |
+| `SMTP_FROM`, `SMTP_FROM_NAME` | Sender address (same as `SMTP_USERNAME` for Gmail) and display name. |
+| `JWT_SECRET` | Secret that signs login tokens. Set a long random value. |
+| `APP_BASE_URL`, `PUBLIC_VERIFY_BASE_URL` | Public addresses used in links and QR codes. Change them when you deploy. |
+
+Write each value as `NAME=value`, with no quotes and no comment after it. **`.env` is ignored by git. Never commit it or share it.** Restart the backend after changing it.
 
 ---
 
-### Step 1: Clone and Configure Environment
+## Run the parts yourself
 
 ```bash
-git clone https://github.com/Sanjaykj23/CertFlow.git
-cd CertFlow
-cp .env.example .env
+# Backend (API on http://localhost:8081)
+./mvnw install -pl certflow-common -am -DskipTests
+./mvnw spring-boot:run -pl certflow-api -Dspring-boot.run.profiles=local
+
+# Frontend (http://localhost:5173)
+cd certflow-frontend && npm install && npm run dev
 ```
 
-Edit `.env` and set your database and email credentials:
+On Windows, `run-backend-local.bat` and `run-frontend-local.bat` do the same and also load `.env`. Spring doesn't read `.env` by itself, so on macOS/Linux export the variables first (`set -a; source .env; set +a`).
 
-```ini
-# Supabase PostgreSQL Database
-DATABASE_URL=jdbc:postgresql://db.<your-project>.supabase.co:5432/postgres?sslmode=require
-DATABASE_USER=postgres
-DATABASE_PASSWORD=<your-supabase-db-password>
-DATABASE_DRIVER=org.postgresql.Driver
+### Demo mode (no backend)
 
-# Gmail SMTP Email Delivery
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=<your-gmail-address>@gmail.com
-SMTP_PASSWORD=<your-16-character-app-password>
-SMTP_FROM=<your-gmail-address>@gmail.com
-SMTP_FROM_NAME=CertFlow Platform
-```
-
----
-
-### Step 2: Build the Modules
-
-```bash
-# Windows
-.\mvnw.cmd clean install -DskipTests
-
-# Linux / macOS
-./mvnw clean install -DskipTests
-```
-
----
-
-### Step 3: Run the Backend
-
-```bash
-# Windows (PowerShell)
-.\run-backend-local.ps1
-
-# Or via Maven directly
-.\mvnw.cmd spring-boot:run -pl certflow-api -Dspring-boot.run.profiles=local
-```
-*API starts on `http://localhost:8081`*
-
----
-
-### Step 4: Run the Frontend
+The UI can run entirely in the browser with fake data and a simulated pipeline. Nothing is sent and nothing is saved on a server.
 
 ```bash
 cd certflow-frontend
-npm install
-npm run dev
+VITE_DEMO=true npm run dev    # PowerShell: $env:VITE_DEMO="true"; npm run dev
 ```
-*Frontend opens at `http://localhost:5173`*
+
+Demo account: `demo@certflow.dev` / `Demo@1234`.
 
 ---
 
-## Running in Full Docker Mode (Optional)
+## Distributed mode (optional)
 
-To run the complete distributed setup with Kafka, Redis, CockroachDB, MinIO, and Mailpit:
+For production-style scale there is an event pipeline: Transactional Outbox, Kafka, separate PDF and email workers, a dead-letter queue, Redis caching for verification and S3/MinIO storage. Start the infrastructure with:
 
 ```bash
 docker compose up -d
 ```
 
-| Service | Port | Description |
-|---|---|---|
-| **Frontend UI** | `http://localhost:5173` | CertFlow Web Application |
-| **Backend REST API** | `http://localhost:8081` | Spring Boot API |
-| **Mailpit (Local Email)** | `http://localhost:8025` | Web-based email inbox preview |
-| **MinIO Console** | `http://localhost:9001` | S3 Storage browser (`minioadmin` / `minioadmin`) |
-| **CockroachDB Admin** | `http://localhost:8080` | Distributed database management console |
-| **Grafana Dashboards** | `http://localhost:3001` | System metrics & monitoring |
+| Service | URL |
+|---|---|
+| Mailpit (test inbox) | http://localhost:8025 |
+| MinIO console | http://localhost:9001 (`minioadmin` / `minioadmin`) |
+| CockroachDB console | http://localhost:8080 |
+| Grafana | http://localhost:3001 |
+
+The simple local run skips all of this.
 
 ---
 
-## Verification & Workflow Walkthrough
+## Architecture
 
-1. **Register**: Navigate to `http://localhost:5173/register`, enter your name and email, and receive a 6-digit OTP in your inbox. Enter the code to activate your organization.
-2. **Create Event**: Create an event (e.g., *National AI Summit 2026*). A responsive default certificate template is created automatically.
-3. **Customize Template**: Customize typography, organization seals, and placement in the Visual Template Designer.
-4. **Upload CSV**: Upload `sample-participants.csv` to validate participant names, emails, and certificate awards.
-5. **Launch Batch**: Watch the live processing bar generate PDFs, issue verification tokens, and dispatch certificate emails.
-6. **Verify Online**: Scan the QR code on any certificate or visit `http://localhost:5173/verify/<token>` to view the public verification certificate.
-7. **Failure Resilience**: If an invalid recipient email is provided, the system flags the delivery attempt as `FAILED`, displays the exact SMTP reason in the dashboard, and allows one-click resending after updating details.
+```
+ Browser (React, port 5173)
+        |  REST /api/v1 + JWT
+        v
+ Spring Boot API (port 8081)
+   auth and OTP · organizations · events · templates
+   CSV validation · batches · PDF + QR rendering · SMTP delivery
+        |                 |                    |
+        v                 v                    v
+   Database          File storage         Gmail / SMTP
+ (H2 or Postgres)  (local or S3/MinIO)
+```
+
+```
+certflow-api/            Spring Boot REST API
+certflow-common/         Shared models, PDF renderer (PDFBox), QR codes, fonts
+certflow-frontend/       React + TypeScript + Vite + Tailwind app
+certflow-worker-pdf/     PDF worker (distributed mode)
+certflow-worker-email/   Email worker (distributed mode)
+monitoring/              Prometheus and Grafana config
+docker-compose.yml       Infrastructure for distributed mode
+sample-participants.csv  Example roster
+```
+
+---
+
+## Troubleshooting
+
+| Problem | What to check |
+|---|---|
+| Sign-up email never arrives | Read the backend window for `Failed to send verification email` and the reason. Check `.env`: no `FILL ME` text left, no quotes, App Password not your normal password, 2-Step Verification on. Restart the backend after any change. Check Spam. |
+| `535 Username and Password not accepted` | Wrong App Password, or `SMTP_USERNAME` isn't the account that made it. |
+| `http://localhost:5173` won't open | The frontend window must be running and show `Local: http://localhost:5173`. |
+| Frontend shows network errors | The backend is still starting, or its window shows an error. Wait for `Started CertFlowApiApplication`. |
+| Port 8081 or 5173 already in use | Close the old CertFlow windows and start again. |
+| Build fails with a Java error | Use JDK 17 or newer. Delete `~/.m2/wrapper` and retry if the Maven download was interrupted. |
+| Want a clean start | Stop the app and delete `certflow-api/data/` (this erases all accounts and events). |
+
+---
+
+## Security notes
+
+- Set your own `JWT_SECRET` before deploying anywhere public.
+- Never commit `.env`. If a password was shared in chat or committed by mistake, revoke the App Password and reset the database password.
+- The certificate PDF download link is public to anyone who has the certificate ID. Add access control before real-world use.
 
 ---
 
 ## License
 
-This project is licensed under the Apache 2.0 License.
+Apache 2.0.
