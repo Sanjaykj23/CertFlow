@@ -104,7 +104,14 @@ export const CsvImport: React.FC = () => {
       });
 
       if (res.data.success) {
-        setValidationResult(res.data.data);
+        const result = res.data.data;
+        // A bad header row comes back as success with no rows and a single "header" error.
+        const headerError = (result?.errors || []).find((e: any) => e?.field === 'header');
+        if (headerError && !(result?.previewRows || []).length) {
+          setError(headerError.message || 'The first row must hold the column names shown above.');
+          return;
+        }
+        setValidationResult(result);
       }
     } catch (err: any) {
       setError(

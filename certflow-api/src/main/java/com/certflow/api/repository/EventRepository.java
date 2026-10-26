@@ -86,13 +86,10 @@ public class EventRepository {
     public List<EventDtos.EventDto> findByOrganizationId(UUID organizationId) {
         String sql = """
             SELECT e.id, e.organization_id, e.name, e.description, e.event_date, e.archived, e.created_at, e.updated_at,
-                   COUNT(DISTINCT b.id) AS batch_count,
-                   COUNT(DISTINCT c.id) AS certificate_count
+                   (SELECT COUNT(*) FROM certificate_batches b WHERE b.event_id = e.id) AS batch_count,
+                   (SELECT COUNT(*) FROM certificates c WHERE c.event_id = e.id) AS certificate_count
             FROM events e
-            LEFT JOIN certificate_batches b ON e.id = b.event_id
-            LEFT JOIN certificates c ON e.id = c.event_id
             WHERE e.organization_id = :orgId
-            GROUP BY e.id, e.organization_id, e.name, e.description, e.event_date, e.archived, e.created_at, e.updated_at
             ORDER BY e.event_date DESC, e.created_at DESC
             """;
 

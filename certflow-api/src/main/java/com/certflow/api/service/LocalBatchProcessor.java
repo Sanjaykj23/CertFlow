@@ -100,6 +100,11 @@ public class LocalBatchProcessor {
                 log.error("Failed to process certificate job {}: {}", job.getId(), ex.getMessage(), ex);
                 jobRepository.markFailed(job.getId(), ex.getMessage(), ErrorCategory.PERMANENT, null);
                 batchRepository.incrementCounters(job.getBatchId(), 0, 0, 1);
+                try {
+                    finalizeBatchIfDone(job.getBatchId());
+                } catch (Exception finalizeEx) {
+                    log.warn("Could not finalize batch {}: {}", job.getBatchId(), finalizeEx.getMessage());
+                }
             }
         }
     }
@@ -112,6 +117,11 @@ public class LocalBatchProcessor {
 
         CertificateBatch batch = batchRepository.findById(job.getBatchId())
                 .orElseThrow(() -> new IllegalStateException("Batch not found: " + job.getBatchId()));
+
+        if (batch.getStatus() == BatchStatus.CANCELLED) {
+            jobRepository.markCancelled(job.getId());
+            return;
+        }
 
         BatchParticipant participant = participantRepository.findById(job.getParticipantId())
                 .orElseThrow(() -> new IllegalStateException("Participant not found: " + job.getParticipantId()));
@@ -278,9 +288,19 @@ public class LocalBatchProcessor {
             batchRepository.incrementCounters(batch.getId(), 1, sentDelta, 0);
         }
 
-        // Update batch status if all done
-        batchRepository.findById(batch.getId()).ifPresent(updatedBatch -> {
-            if (updatedBatch.getGeneratedCount() + updatedBatch.getFailedCount() >= updatedBatch.getTotalCount()) {
+        finalizeBatchIfDone(batch.getId());
+
+        log.info("Locally generated certificate {} for participant {} ({})", certNumber, participant.getParticipantName(), participant.getEmail());
+    }
+
+    /**
+     * Marks the batch finished once none of its jobs is pending. Counts unfinished jobs rather than
+     * generated+failed: an email failure increments both counters, which would finish the batch early.
+     */
+    private void finalizeBatchIfDone(UUID batchId) {
+        batchRepository.findById(batchId).ifPresent(updatedBatch -> {
+            if (updatedBatch.getStatus() != BatchStatus.CANCELLED
+                    && jobRepository.countUnfinishedJobs(updatedBatch.getId()) == 0) {
                 BatchStatus finalStatus = updatedBatch.getFailedCount() > 0
                         ? BatchStatus.PARTIALLY_FAILED
                         : BatchStatus.COMPLETED;
@@ -290,7 +310,5 @@ public class LocalBatchProcessor {
                         updatedBatch.getEmailSentCount(), updatedBatch.getFailedCount());
             }
         });
-
-        log.info("Locally generated certificate {} for participant {} ({})", certNumber, participant.getParticipantName(), participant.getEmail());
     }
 }

@@ -94,7 +94,9 @@ public class BatchService {
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
         organizationService.verifyMembership(event.getOrganizationId(), userId, UserRole.OPERATOR);
 
-        if (batch.getStatus() == BatchStatus.PROCESSING || batch.getStatus() == BatchStatus.COMPLETED) {
+        // Only a not-yet-launched batch can be started; claim it atomically so a double submit
+        // cannot enqueue every participant twice (each would get two emails).
+        if (!batchRepository.transitionStatus(batchId, List.of(BatchStatus.DRAFT, BatchStatus.VALIDATED), BatchStatus.QUEUED)) {
             throw new IllegalStateException("Batch is already " + batch.getStatus());
         }
 

@@ -185,6 +185,21 @@ public class CertificateJobRepository {
                 .list();
     }
 
+    public void markCancelled(UUID jobId) {
+        jdbcClient.sql("UPDATE certificate_jobs SET status = 'CANCELLED', error_message = 'Batch cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = :id")
+                .param("id", jobId)
+                .update();
+    }
+
+    /** Jobs of the batch that have not reached a terminal state yet. */
+    public int countUnfinishedJobs(UUID batchId) {
+        Integer n = jdbcClient.sql("SELECT COUNT(*) FROM certificate_jobs WHERE batch_id = :batchId AND status IN ('PENDING', 'QUEUED', 'PROCESSING')")
+                .param("batchId", batchId)
+                .query(Integer.class)
+                .single();
+        return n != null ? n : 0;
+    }
+
     public List<CertificateJob> findQueuedJobs(int limit) {
         String sql = "SELECT * FROM certificate_jobs WHERE status IN ('QUEUED', 'PENDING') ORDER BY created_at ASC LIMIT :limit";
         return jdbcClient.sql(sql)

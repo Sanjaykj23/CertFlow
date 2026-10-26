@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: certflow-api
+  servlet:
+    multipart:
+      # Template designs embed uploaded images (up to 5 MB each, base64) in the "template" JSON part.
+      max-file-size: 25MB
+      max-request-size: 30MB
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/certflow}
     username: ${DATABASE_USER:postgres}

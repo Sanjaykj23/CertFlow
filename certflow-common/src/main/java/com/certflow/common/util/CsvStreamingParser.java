@@ -57,7 +57,7 @@ public final class CsvStreamingParser {
 
             if (headerMap != null) {
                 for (String h : headerMap.keySet()) {
-                    String clean = h.trim().toLowerCase(Locale.ROOT).replace(" ", "_").replace("-", "");
+                    String clean = h.replace("\uFEFF", "").trim().toLowerCase(Locale.ROOT).replace(" ", "_").replace("-", "");
                     if (nameHeader == null && (clean.equals("participant_name") || clean.equals("name") || clean.equals("fullname") || clean.equals("full_name") || clean.equals("student_name") || clean.equals("attendee") || clean.equals("recipient_name") || clean.equals("recipient"))) {
                         nameHeader = h;
                     } else if (emailHeader == null && (clean.equals("email") || clean.equals("email_address") || clean.equals("emailaddress") || clean.equals("mail") || clean.equals("recipient_email"))) {
@@ -91,9 +91,10 @@ public final class CsvStreamingParser {
                 totalRows++;
                 int rowIndex = (int) record.getRecordNumber();
 
-                String name = record.get(nameHeader);
-                String email = record.get(emailHeader);
-                String certType = certTypeHeader != null ? record.get(certTypeHeader) : "Participant";
+                // isSet(): a short row (fewer cells than headers) must become a row error, not an exception.
+                String name = record.isSet(nameHeader) ? record.get(nameHeader) : null;
+                String email = record.isSet(emailHeader) ? record.get(emailHeader) : null;
+                String certType = certTypeHeader != null && record.isSet(certTypeHeader) ? record.get(certTypeHeader) : "Participant";
 
                 List<String> rowErrors = new ArrayList<>();
 

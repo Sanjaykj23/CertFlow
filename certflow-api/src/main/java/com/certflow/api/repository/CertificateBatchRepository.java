@@ -56,18 +56,29 @@ public class CertificateBatchRepository {
 
     public void updateStatus(UUID batchId, BatchStatus status) {
         Instant now = Instant.now();
-        String sql = """
-            UPDATE certificate_batches
-            SET status = :status, updated_at = :now,
-                completed_at = CASE WHEN :status IN ('COMPLETED', 'PARTIALLY_FAILED', 'FAILED') THEN :now ELSE completed_at END
-            WHERE id = :id
-            """;
+        // Decide terminal-ness in Java: an untyped bind parameter inside CASE/IN is not portable (H2).
+        boolean terminal = status == BatchStatus.COMPLETED || status == BatchStatus.PARTIALLY_FAILED
+                || status == BatchStatus.FAILED;
+        String sql = terminal
+                ? "UPDATE certificate_batches SET status = :status, updated_at = :now, completed_at = :now WHERE id = :id"
+                : "UPDATE certificate_batches SET status = :status, updated_at = :now WHERE id = :id";
 
         jdbcClient.sql(sql)
                 .param("id", batchId)
                 .param("status", status.name())
                 .param("now", Timestamp.from(now))
                 .update();
+    }
+
+    /** Atomically moves the batch to {@code to} only if it is currently in one of {@code from}. */
+    public boolean transitionStatus(UUID batchId, List<BatchStatus> from, BatchStatus to) {
+        String sql = "UPDATE certificate_batches SET status = :to, updated_at = :now WHERE id = :id AND status IN (:from)";
+        return jdbcClient.sql(sql)
+                .param("id", batchId)
+                .param("to", to.name())
+                .param("now", Timestamp.from(Instant.now()))
+                .param("from", from.stream().map(Enum::name).toList())
+                .update() > 0;
     }
 
     public void incrementCounters(UUID batchId, int genDelta, int emailDelta, int failDelta) {

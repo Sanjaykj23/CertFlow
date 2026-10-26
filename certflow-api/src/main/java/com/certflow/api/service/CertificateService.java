@@ -205,7 +205,9 @@ public class CertificateService {
         return toDto(replacementCert, event.getName());
     }
 
-    @Transactional
+    // The local SMTP path records FAILED status/attempts and then throws to report the error:
+    // those writes must survive, so do not roll back on the exceptions it throws.
+    @Transactional(noRollbackFor = {IllegalArgumentException.class, IllegalStateException.class})
     public void resendEmail(UUID certificateId, UUID userId) {
         Certificate cert = certificateRepository.findById(certificateId)
                 .orElseThrow(() -> new IllegalArgumentException("Certificate not found"));
@@ -312,6 +314,7 @@ public class CertificateService {
                 .id(cert.getId())
                 .jobId(cert.getJobId())
                 .eventId(cert.getEventId())
+                .templateId(cert.getTemplateId())
                 .eventName(eventName)
                 .certificateNumber(cert.getCertificateNumber())
                 .verificationToken(cert.getVerificationToken())

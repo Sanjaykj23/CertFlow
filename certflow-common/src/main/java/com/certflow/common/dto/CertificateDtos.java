@@ -21,6 +21,7 @@ public class CertificateDtos {
         private UUID id;
         private UUID jobId;
         private UUID eventId;
+        private UUID templateId;
         private String eventName;
         private String certificateNumber;
         private String verificationToken;

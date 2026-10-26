@@ -10,4 +10,4 @@ Needs: Java 17+, Node 18+ (check with `java -version`, `node -v`). No Docker, no
    Each participant gets their certificate PDF by email from your Gmail account.
 
 Gmail limit: about 500 emails a day for a normal account. Test with your own address first.
-Data lives in `data/` and generated PDFs in `certflow-api/storage-data/`.
+Data lives in `certflow-api/data/` and generated PDFs in `certflow-api/storage-data/` (the backend runs from the `certflow-api` folder).

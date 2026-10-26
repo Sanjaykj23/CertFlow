@@ -292,7 +292,7 @@ export const Certificates: React.FC = () => {
                       )}
                     </td>
                     <td className="whitespace-nowrap font-mono text-[12px] text-ink-500">
-                      {formatWhen(c.issueDate || c.createdAt)}
+                      {formatWhen(c.issuedAt || c.issueDate || c.createdAt)}
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-0.5">
@@ -392,7 +392,7 @@ export const Certificates: React.FC = () => {
                     event_name: eventName(viewCert),
                     organization_name: viewCert.organizationName || activeOrg?.organizationName || '',
                     certificate_type: viewCert.certificateType || '',
-                    issue_date: formatDate(viewCert.issueDate || viewCert.createdAt),
+                    issue_date: formatDate(viewCert.issuedAt || viewCert.issueDate || viewCert.createdAt),
                     certificate_number: viewCert.certificateNumber,
                   }}
                   verifyUrl={verifyAbsoluteUrl(viewCert.verificationToken)}

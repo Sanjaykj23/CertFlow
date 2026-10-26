@@ -76,6 +76,11 @@ public class FileSystemStorageService implements StorageService {
     }
 
     private Path resolvePath(String bucket, String key) {
-        return basePath.resolve(bucket).resolve(key).normalize();
+        Path resolved = basePath.resolve(bucket).resolve(key).normalize();
+        // Keys can come from API requests (backgroundStorageKey): never resolve outside the storage root.
+        if (!resolved.startsWith(basePath)) {
+            throw new IllegalArgumentException("Invalid storage key: " + key);
+        }
+        return resolved;
     }
 }

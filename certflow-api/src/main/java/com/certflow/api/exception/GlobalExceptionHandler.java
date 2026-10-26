@@ -50,8 +50,14 @@ public class GlobalExceptionHandler {
         for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.ok("Validation failed", errors));
+        // success=false and a readable message: the UI shows response.data.message.
+        String message = errors.isEmpty() ? "Validation failed" : String.join("; ", errors.values());
+        ApiResponse<Map<String, String>> body = ApiResponse.<Map<String, String>>builder()
+                .success(false)
+                .message(message)
+                .data(errors)
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(Exception.class)

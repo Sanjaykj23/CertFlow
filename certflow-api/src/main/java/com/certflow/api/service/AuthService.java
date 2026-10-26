@@ -68,6 +68,19 @@ public class AuthService {
         this.mailSender = mailSender;
     }
 
+    /**
+     * queryForList() returns the driver's native object: java.sql.Timestamp on PostgreSQL,
+     * but java.time.OffsetDateTime for TIMESTAMP WITH TIME ZONE on H2 2.x.
+     */
+    private static Instant toInstant(Object value) {
+        if (value instanceof java.sql.Timestamp ts) return ts.toInstant();
+        if (value instanceof java.time.OffsetDateTime odt) return odt.toInstant();
+        if (value instanceof java.time.ZonedDateTime zdt) return zdt.toInstant();
+        if (value instanceof java.time.LocalDateTime ldt) return ldt.atZone(java.time.ZoneId.systemDefault()).toInstant();
+        if (value instanceof Instant i) return i;
+        throw new IllegalStateException("Unsupported timestamp value: " + (value == null ? "null" : value.getClass()));
+    }
+
     private String generateOtp() {
         SecureRandom random = new SecureRandom();
         int num = 100000 + random.nextInt(900000);
@@ -152,7 +165,7 @@ public class AuthService {
 
         java.util.Map<String, Object> tokenRow = rows.get(0);
         String expectedOtp = (String) tokenRow.get("otp_code");
-        Instant expiresAt = ((java.sql.Timestamp) tokenRow.get("expires_at")).toInstant();
+        Instant expiresAt = toInstant(tokenRow.get("expires_at"));
 
         if (Instant.now().isAfter(expiresAt)) {
             throw new IllegalArgumentException("Verification code has expired. Please request a new one.");
@@ -239,7 +252,7 @@ public class AuthService {
 
         java.util.Map<String, Object> tokenRow = rows.get(0);
         String expectedOtp = (String) tokenRow.get("otp_code");
-        Instant expiresAt = ((java.sql.Timestamp) tokenRow.get("expires_at")).toInstant();
+        Instant expiresAt = toInstant(tokenRow.get("expires_at"));
 
         if (Instant.now().isAfter(expiresAt)) {
             throw new IllegalArgumentException("Reset code has expired. Please request a new one.");
