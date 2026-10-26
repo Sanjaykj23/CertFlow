@@ -123,8 +123,8 @@ export const TopBar: React.FC<TopBarProps> = (p) => {
   };
 
   return (
-    <div className="shrink-0 border-b border-paper-200 bg-white">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2">
+    <div className="shrink-0 border-b border-paper-200 bg-gradient-to-b from-white to-paper-50/60">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2.5">
         <Link to={`/events/${p.eventId}`} onClick={p.onBack} className="btn-ghost btn-sm -ml-1 shrink-0" aria-label="Back to event">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Event</span>

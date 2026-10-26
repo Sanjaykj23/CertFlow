@@ -3,7 +3,7 @@ import { store } from '../lib/storage';
 import { buildSeed } from './seed';
 import type { DB } from './types';
 
-export const DB_KEY = 'certflow_demo_db_v1';
+export const DB_KEY = 'certflow_data_v2';
 
 let db: DB | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;

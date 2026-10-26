@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import { isDemo } from '../lib/env';
 import { Logo, Seal, Modal } from '../components/ui';
-import { ArrowRight, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { ArrowRight, CheckCircle2, AlertCircle, Info, ShieldCheck, ScanLine, KeyRound } from 'lucide-react';
 
 const STEPS = [
   { n: '01', title: 'Import roster', body: 'Upload a CSV of recipients and map the columns.' },
@@ -12,35 +12,131 @@ const STEPS = [
   { n: '03', title: 'Verify by QR', body: 'Anyone who scans the code sees the public record.' },
 ];
 
+/** A decorative QR-like matrix: finder squares plus a fixed pseudo-random fill. */
+const QrMark: React.FC<{ size?: number; className?: string }> = ({ size = 56, className = '' }) => {
+  const n = 21;
+  const cells: React.ReactNode[] = [];
+  let seed = 7;
+  const rnd = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  const inFinder = (x: number, y: number) =>
+    (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const r = rnd();
+      if (inFinder(x, y)) continue;
+      if (r > 0.52) cells.push(<rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" />);
+    }
+  }
+  const finder = (x: number, y: number) => (
+    <g key={`f${x}${y}`}>
+      <rect x={x} y={y} width="7" height="7" />
+      <rect x={x + 1} y={y + 1} width="5" height="5" fill="#fff" />
+      <rect x={x + 2} y={y + 2} width="3" height="3" />
+    </g>
+  );
+  return (
+    <svg width={size} height={size} viewBox={`-1 -1 ${n + 2} ${n + 2}`} className={className} aria-hidden="true" shapeRendering="crispEdges">
+      <rect x="-1" y="-1" width={n + 2} height={n + 2} fill="#fff" />
+      <g fill="#0F1A2B">
+        {cells}
+        {finder(0, 0)}
+        {finder(n - 7, 0)}
+        {finder(0, n - 7)}
+      </g>
+    </svg>
+  );
+};
+
+/** The composed certificate illustration shown beside the auth forms. */
+const CertificateArt: React.FC = () => (
+  <div className="relative mx-auto w-full max-w-[440px] select-none" aria-hidden="true">
+    {/* glow */}
+    <div className="absolute -inset-10 rounded-full bg-seal-500/25 blur-3xl" />
+    {/* back sheet */}
+    <div className="absolute inset-0 translate-x-6 translate-y-5 rotate-[5deg] rounded-xl border border-white/10 bg-white/[0.06] backdrop-blur-sm" />
+    {/* front sheet */}
+    <div className="relative motion-safe:animate-float">
+      <div className="relative aspect-[1.414/1] rounded-xl bg-[#FBF8F1] p-3 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.4)]">
+        <div className="guilloche absolute inset-0 rounded-xl opacity-70" />
+        <div className="relative flex h-full flex-col items-center rounded-md border border-foil-500/40 p-1">
+          <div className="flex h-full w-full flex-col items-center rounded-[3px] border border-foil-500/25 px-6 pt-5 text-center">
+            <p className="font-mono text-[8px] uppercase tracking-[0.3em] text-foil-600">CertFlow Academy</p>
+            <p className="mt-2 font-serif text-[19px] font-semibold uppercase tracking-[0.12em] text-ink">Certificate</p>
+            <p className="font-mono text-[7.5px] uppercase tracking-[0.35em] text-ink-500">of achievement</p>
+            <p className="mt-3 text-[8px] uppercase tracking-[0.2em] text-ink-400">Proudly presented to</p>
+            <p className="mt-1 font-serif text-[24px] italic leading-tight text-seal-700">Ananya Rao</p>
+            <span className="mt-1 h-px w-40 bg-gradient-to-r from-transparent via-foil-500/60 to-transparent" />
+            <p className="mt-1.5 max-w-[230px] text-[8px] leading-relaxed text-ink-500">
+              for outstanding work at the National AI Hackathon 2026
+            </p>
+            <div className="mt-auto flex w-full items-end justify-between pb-3">
+              <div className="flex items-center gap-2">
+                <Seal size={40} tone="foil" />
+                <div className="text-left">
+                  <span className="block h-px w-16 bg-ink-300" />
+                  <span className="mt-1 block font-mono text-[6.5px] uppercase tracking-wider text-ink-400">Registrar</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <QrMark size={44} className="ml-auto rounded-sm" />
+                <span className="mt-1 block font-mono text-[6.5px] tracking-wider text-ink-400">CF-2026-000149</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* verification chip */}
+      <div className="absolute -bottom-6 -right-4 flex items-center gap-2.5 rounded-xl border border-white/15 bg-ink/80 py-2.5 pl-2.5 pr-4 shadow-pop backdrop-blur-md sm:-right-8">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ok-500/20 ring-1 ring-ok-500/40">
+          <ShieldCheck className="h-4 w-4 text-[#7FD8A6]" />
+        </span>
+        <span>
+          <span className="block text-[12px] font-semibold text-white">Valid certificate</span>
+          <span className="block font-mono text-[10px] text-white/50">Registry check passed</span>
+        </span>
+      </div>
+      {/* scan chip */}
+      <div className="absolute -left-6 top-8 hidden items-center gap-2 rounded-full border border-white/15 bg-ink/80 px-3 py-1.5 text-[11px] font-semibold text-white/85 shadow-pop backdrop-blur-md xl:flex">
+        <ScanLine className="h-3.5 w-3.5 text-foil-400" />
+        Scan to verify
+      </div>
+    </div>
+  </div>
+);
+
 /** Shared two-panel shell used by Login and Register. */
 export const AuthShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex min-h-screen flex-col bg-paper lg:flex-row">
-    <aside className="guilloche relative bg-ink text-white lg:flex lg:w-[44%] lg:max-w-[600px] lg:flex-col lg:justify-between lg:px-12 lg:py-12">
+  <div className="flex min-h-screen flex-col lg:flex-row">
+    <aside className="hero-ink relative isolate overflow-hidden text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[48%] lg:max-w-[680px] lg:flex-col lg:justify-between lg:px-12 lg:py-10">
+      <div className="guilloche-light absolute inset-0 -z-10" aria-hidden="true" />
       <div className="flex items-center justify-between px-4 py-4 sm:px-8 lg:p-0">
         <Logo inverted />
         <span className="eyebrow !text-ink-300 lg:hidden">Certificates, verified</span>
       </div>
       <div className="hidden lg:block">
-        <Seal size={96} tone="foil" />
-        <h1 className="mt-8 max-w-sm font-display text-[34px] font-semibold leading-[1.1] tracking-tight text-white">
-          Issue certificates in bulk. Let anyone verify them in seconds.
+        <h1 className="max-w-md font-display text-[36px] font-semibold leading-[1.08] tracking-[-0.02em] text-white">
+          Issue certificates in bulk. <span className="text-foil-gradient">Let anyone verify them in seconds.</span>
         </h1>
-        <ol className="mt-10 space-y-5">
-          {STEPS.map((s) => (
-            <li key={s.n} className="flex gap-4">
-              <span className="num pt-0.5 text-[12px] text-foil-400">{s.n}</span>
-              <div>
-                <p className="font-display text-[15px] font-semibold">{s.title}</p>
-                <p className="mt-0.5 text-[13px] text-ink-300">{s.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div className="mt-14 px-6">
+          <CertificateArt />
+        </div>
       </div>
-      <p className="eyebrow hidden !text-ink-400 lg:block">How a certificate travels</p>
+      <ol className="hidden grid-cols-3 gap-5 border-t border-white/10 pt-6 lg:grid">
+        {STEPS.map((s) => (
+          <li key={s.n}>
+            <span className="num text-[11px] text-foil-400">{s.n}</span>
+            <p className="mt-1 font-display text-[14px] font-semibold">{s.title}</p>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-ink-300">{s.body}</p>
+          </li>
+        ))}
+      </ol>
     </aside>
-    <main className="flex flex-1 items-start justify-center px-4 py-8 sm:px-8 lg:items-center lg:py-12">
-      <div className="w-full max-w-[420px]">{children}</div>
+    <main className="relative flex flex-1 items-start justify-center px-4 py-8 sm:px-8 lg:items-center lg:py-12">
+      <div className="dot-grid pointer-events-none absolute inset-0 -z-10 opacity-60 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]" aria-hidden="true" />
+      <div className="w-full max-w-[440px] animate-fade-up sm:rounded-[18px] sm:border sm:border-paper-200 sm:bg-white sm:p-9 sm:shadow-lift">{children}</div>
     </main>
   </div>
 );
@@ -131,27 +227,30 @@ export const Login: React.FC = () => {
       <p className="page-lead">Sign in to manage events, rosters and issued certificates.</p>
 
       {isDemo && (
-        <div className="panel-muted mt-6 p-4">
-          <p className="eyebrow">Demo account</p>
+        <div className="relative mt-6 overflow-hidden rounded-xl border border-seal-100 bg-gradient-to-br from-seal-50 to-white p-4">
+          <p className="eyebrow flex items-center gap-1.5 !text-seal-700">
+            <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+            Quick sign-in
+          </p>
           <dl className="mt-2 space-y-1 text-[13px]">
             <div className="flex gap-2">
               <dt className="w-16 text-ink-500">Email</dt>
-              <dd className="num break-all text-ink">demo@certflow.dev</dd>
+              <dd className="num break-all text-ink">organizer@certflow.app</dd>
             </div>
             <div className="flex gap-2">
               <dt className="w-16 text-ink-500">Password</dt>
-              <dd className="num text-ink">Demo@1234</dd>
+              <dd className="num text-ink">CertFlow@2026</dd>
             </div>
           </dl>
           <button
             type="button"
-            className="btn-secondary btn-sm mt-3"
+            className="btn-primary btn-sm mt-3"
             onClick={() => {
-              setEmail('demo@certflow.dev');
-              setPassword('Demo@1234');
+              setEmail('organizer@certflow.app');
+              setPassword('CertFlow@2026');
             }}
           >
-            Fill in demo credentials
+            Use sample account
           </button>
         </div>
       )}
@@ -272,7 +371,7 @@ export const Login: React.FC = () => {
                 <div className="alert-info items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Info className="h-4 w-4 shrink-0" />
-                    Demo code: <span className="num font-semibold">{demoOtp}</span>
+                    Verification code: <span className="num font-semibold">{demoOtp}</span>
                   </span>
                   <button type="button" className="btn-secondary btn-sm" onClick={() => setForgotOtp(demoOtp)}>
                     Use this code

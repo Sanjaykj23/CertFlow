@@ -271,7 +271,11 @@ export const TemplateBuilder: React.FC = () => {
             className={cx(
               'flex shrink-0 flex-col items-center justify-center gap-1 rounded-md text-[10.5px] font-medium transition-colors',
               horizontal ? 'h-12 min-w-[64px] flex-1 px-2' : 'h-[54px] w-full',
-              active ? 'bg-seal-50 text-seal-800' : 'text-ink-500 hover:bg-paper-100 hover:text-ink',
+              active
+                ? horizontal
+                  ? 'bg-white text-seal-700 shadow-[inset_0_-2px_0_#12877F]'
+                  : 'bg-white text-seal-700 shadow-raise ring-1 ring-paper-200'
+                : 'text-ink-500 hover:bg-white/70 hover:text-ink',
             )}
           >
             <t.icon className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -300,7 +304,7 @@ export const TemplateBuilder: React.FC = () => {
     <div
       ref={rootRef}
       style={{ height }}
-      className="relative flex min-h-0 flex-col overflow-hidden rounded-panel border border-paper-200 bg-white shadow-panel"
+      className="relative flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-paper-200 bg-white shadow-raise"
     >
       <TopBar
         designer={designer}
@@ -354,7 +358,7 @@ export const TemplateBuilder: React.FC = () => {
       <div className="relative flex min-h-0 flex-1">
         {!narrow && (
           <>
-            <nav aria-label="Design tools" className="w-[66px] shrink-0 border-r border-paper-200 bg-paper-50">
+            <nav aria-label="Design tools" className="w-[68px] shrink-0 border-r border-paper-200 bg-gradient-to-b from-paper-50 to-paper-100/60">
               {tabButtons(false)}
             </nav>
             {panelOpen && (
@@ -365,7 +369,7 @@ export const TemplateBuilder: React.FC = () => {
           </>
         )}
 
-        <div className="flex min-w-0 flex-1 flex-col bg-paper-100">
+        <div className="dot-grid flex min-w-0 flex-1 flex-col bg-paper-100">
           <div className="relative min-h-0 flex-1">
             <DesignerStage
               designer={designer}
@@ -378,12 +382,12 @@ export const TemplateBuilder: React.FC = () => {
               preview={preview}
             />
             {loading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-paper-100/80">
+              <div className="absolute inset-0 flex items-center justify-center bg-paper-100/80 backdrop-blur-[2px]">
                 <Spinner label="Loading template" />
               </div>
             )}
           </div>
-          <div className="flex h-7 shrink-0 items-center justify-between gap-3 border-t border-paper-200 bg-white px-3 text-[11.5px] text-ink-500">
+          <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-paper-200 bg-white/90 px-3.5 text-[11.5px] text-ink-500 backdrop-blur">
             <span aria-live="polite">
               {preview
                 ? 'Preview with sample values'

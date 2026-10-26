@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Search } from 'lucide-react';
-import { PageHeader, StatusStamp, EmptyState, PageLoading, formatWhen } from '../components/ui';
+import { Search, ScrollText, UserRound } from 'lucide-react';
+import { PageHeader, StatusStamp, EmptyState, TableSkeleton, Avatar, formatWhen } from '../components/ui';
+
+const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isId = (v: string) => ID_RE.test(v);
+/** Shortens a UUID for display; the full value stays in the title attribute. */
+const shortId = (v: string) => (isId(v) ? `${v.slice(0, 8)}…${v.slice(-4)}` : v);
 
 export const AuditLogs: React.FC = () => {
   const { activeOrg } = useAuth();
@@ -47,8 +52,9 @@ export const AuditLogs: React.FC = () => {
         description="A record of sensitive actions in this organization: batch launches, revocations and replacements. Showing the latest 100."
       />
 
-      <section className="panel mb-5">
-        <div className="panel-body">
+      <section className="panel overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-paper-200/80 bg-gradient-to-b from-paper-50/80 to-white p-4 sm:flex-row sm:items-end sm:justify-between sm:p-5">
+          <div className="w-full sm:max-w-md">
           <label htmlFor="audit-filter" className="label">Filter</label>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
@@ -61,12 +67,16 @@ export const AuditLogs: React.FC = () => {
               onChange={(e) => setFilter(e.target.value)}
             />
           </div>
+          </div>
+          {!loading && (
+            <p className="text-[12px] text-ink-500">
+              <span className="num font-semibold text-ink">{shown.length}</span>
+              {shown.length !== logs.length && <span className="num"> of {logs.length}</span>} records
+            </p>
+          )}
         </div>
-      </section>
-
-      <section className="panel overflow-hidden">
         {loading ? (
-          <PageLoading label="Loading audit log" />
+          <TableSkeleton rows={8} cols={5} label="Loading audit log" />
         ) : shown.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="ledger w-full">
@@ -83,11 +93,28 @@ export const AuditLogs: React.FC = () => {
                 {shown.map((log) => (
                   <tr key={log.id}>
                     <td className="whitespace-nowrap font-mono text-[12px] text-ink-500">{formatWhen(log.createdAt)}</td>
-                    <td className="text-ink-700">{actorOf(log)}</td>
+                    <td className="text-ink-700">
+                      {isId(actorOf(log)) ? (
+                        <span className="flex items-center gap-2.5 whitespace-nowrap" title={actorOf(log)}>
+                          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-paper-100 text-ink-400 ring-1 ring-paper-200" aria-hidden="true">
+                            <UserRound className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="font-mono text-[12px] text-ink-600">{shortId(actorOf(log))}</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2.5 whitespace-nowrap">
+                          <Avatar name={actorOf(log)} size="sm" />
+                          {actorOf(log)}
+                        </span>
+                      )}
+                    </td>
                     <td>
                       <StatusStamp status={log.action} tone="seal" dot={false} />
                     </td>
-                    <td className="font-mono text-[12px] text-ink-600">{targetOf(log)}</td>
+                    <td className="whitespace-nowrap" title={targetOf(log)}>
+                      <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-400">{log.resourceType || '-'}</span>
+                      {log.resourceId && <span className="block font-mono text-[12px] text-ink-600">{shortId(String(log.resourceId))}</span>}
+                    </td>
                     <td className="max-w-md truncate font-mono text-[11px] text-ink-500" title={log.detailsJson || ''}>
                       {log.detailsJson || '-'}
                     </td>
@@ -98,6 +125,7 @@ export const AuditLogs: React.FC = () => {
           </div>
         ) : (
           <EmptyState
+            icon={logs.length === 0 ? <ScrollText className="h-5 w-5" /> : <Search className="h-5 w-5" />}
             title={logs.length === 0 ? 'No audit records yet' : 'No records match your filter'}
             description={
               logs.length === 0

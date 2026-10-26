@@ -12,8 +12,8 @@ import {
 import type { BatchRec, CertRec, DB, EventRec, JobRec, MemberRec, OrgRec, Role, TemplateRec, UserRec } from './types';
 import { DAY, HOUR, MIN, newToken, uuid, ymd } from './util';
 
-export const DEMO_EMAIL = 'demo@certflow.dev';
-export const DEMO_PASSWORD = 'Demo@1234';
+export const DEMO_EMAIL = 'organizer@certflow.app';
+export const DEMO_PASSWORD = 'CertFlow@2026';
 
 const el = (
   id: string,
@@ -128,7 +128,7 @@ export function buildSeed(now: number = Date.now()): DB {
     db.users[u.id] = u;
     return u;
   };
-  const owner = mkUser(DEMO_EMAIL, 'Demo Organizer');
+  const owner = mkUser(DEMO_EMAIL, 'Priya Nair');
   const admin = mkUser('meena.admin@certflow.dev', 'Meena Krishnan');
   const operator = mkUser('karthik.operator@certflow.dev', 'Karthik Raja');
   const viewer = mkUser('divya.viewer@certflow.dev', 'Divya Lakshmi');

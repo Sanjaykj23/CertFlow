@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus } from 'lucide-react';
-import { PageHeader, StatusStamp, EmptyState, Modal, formatWhen } from '../components/ui';
+import { UserPlus, Crown, ShieldCheck, Wrench, Eye, Users } from 'lucide-react';
+import { PageHeader, StatusStamp, EmptyState, Modal, Avatar, formatWhen } from '../components/ui';
 
 const LADDER = [
   { role: 'OWNER', text: 'Runs the workspace: team, events, templates, batches and revocations.' },
@@ -10,6 +10,8 @@ const LADDER = [
   { role: 'OPERATOR', text: 'Creates batches, retries deliveries and watches pipelines.' },
   { role: 'VIEWER', text: 'Reads certificates and batch reports. Cannot change anything.' },
 ];
+
+const LADDER_ICONS = [Crown, ShieldCheck, Wrench, Eye];
 
 export const Members: React.FC = () => {
   const { activeOrg } = useAuth();
@@ -90,7 +92,14 @@ export const Members: React.FC = () => {
       {notice && <div className="alert-ok mb-4" role="status">{notice}</div>}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className="panel overflow-hidden">
+        <section className="panel self-start overflow-hidden">
+          <div className="panel-head">
+            <h2 className="panel-title">Team</h2>
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-500">
+              <Users className="h-3.5 w-3.5 text-ink-400" aria-hidden="true" />
+              <span className="num font-semibold text-ink">{members.length}</span> {members.length === 1 ? 'member' : 'members'}
+            </span>
+          </div>
           {members.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="ledger w-full">
@@ -106,9 +115,7 @@ export const Members: React.FC = () => {
                     <tr key={m.id}>
                       <td>
                         <div className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-seal-50 font-display text-[13px] font-semibold text-seal-700">
-                            {(m.name || m.email || '?').charAt(0).toUpperCase()}
-                          </span>
+                          <Avatar name={m.name || m.email} className="!h-9 !w-9" />
                           <div className="min-w-0">
                             <p className="font-medium text-ink">{m.name}</p>
                             <p className="truncate font-mono text-[11px] text-ink-500">{m.email}</p>
@@ -125,7 +132,7 @@ export const Members: React.FC = () => {
               </table>
             </div>
           ) : (
-            <EmptyState title="No members yet" description="Add a teammate by email to share access to this organization." />
+            <EmptyState icon={<Users className="h-5 w-5" />} title="No members yet" description="Add a teammate by email to share access to this organization." />
           )}
         </section>
 
@@ -137,13 +144,22 @@ export const Members: React.FC = () => {
             <p className="mb-3 text-[13px] leading-relaxed text-ink-600">
               Each role can do everything the roles below it can do.
             </p>
-            <ol className="space-y-3">
-              {LADDER.map((l) => (
-                <li key={l.role}>
-                  <StatusStamp status={l.role} />
-                  <p className="mt-1 text-[13px] leading-relaxed text-ink-600">{l.text}</p>
-                </li>
-              ))}
+            <ol className="relative space-y-4">
+              <span className="absolute bottom-3 left-[15px] top-3 w-px bg-gradient-to-b from-foil-400/60 via-seal-200 to-paper-200" aria-hidden="true" />
+              {LADDER.map((l, i) => {
+                const Icon = LADDER_ICONS[i];
+                return (
+                  <li key={l.role} className="relative flex gap-3">
+                    <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-ink-500 shadow-panel ring-1 ring-paper-200" aria-hidden="true">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="pt-1">
+                      <StatusStamp status={l.role} />
+                      <p className="mt-1.5 text-[13px] leading-relaxed text-ink-600">{l.text}</p>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
           </div>
         </aside>

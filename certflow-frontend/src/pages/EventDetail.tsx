@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Upload, Palette, Download, RotateCcw, Ban, ExternalLink } from 'lucide-react';
+import { Upload, Palette, Download, RotateCcw, Ban, ExternalLink, Layers, FileBadge2, MailCheck, ShieldCheck, ArrowRight } from 'lucide-react';
 import api from '../api/client';
 import { CertificateCanvas } from '../components/CertificateCanvas';
-import { EmptyState, Modal, PageHeader, PageLoading, StatusStamp } from '../components/ui';
+import { Avatar, CountUp, EmptyState, IconChip, Modal, PageHeader, PageSkeleton, StatusStamp } from '../components/ui';
 import { downloadCertificate } from '../lib/links';
 
 export const EventDetail: React.FC = () => {
@@ -89,11 +89,18 @@ export const EventDetail: React.FC = () => {
   };
 
   if (loading && !event) {
-    return <PageLoading label="Loading event" />;
+    return <PageSkeleton label="Loading event" figures={4} />;
   }
 
+  const summary = [
+    { label: 'Batches', value: batches.length, icon: Layers, tone: 'ink' as const },
+    { label: 'Certificates', value: certificates.length, icon: FileBadge2, tone: 'seal' as const },
+    { label: 'Valid', value: certificates.filter((c) => c.status !== 'REVOKED' && c.status !== 'REPLACED').length, icon: ShieldCheck, tone: 'ok' as const },
+    { label: 'Emailed', value: certificates.filter((c) => c.emailStatus === 'SENT' || c.emailStatus === 'DELIVERED').length, icon: MailCheck, tone: 'info' as const },
+  ];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         back={{ to: '/events', label: 'All events' }}
         eyebrow={`Event / ${event?.eventDate || ''}`}
@@ -114,6 +121,22 @@ export const EventDetail: React.FC = () => {
         }
       />
 
+      <dl className="stagger -mt-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {summary.map((f) => (
+          <div key={f.label} className="panel flex items-center gap-3.5 px-4 py-3.5">
+            <IconChip tone={f.tone}>
+              <f.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+            </IconChip>
+            <div className="min-w-0">
+              <dt className="eyebrow !text-[10px]">{f.label}</dt>
+              <dd className="font-display text-[22px] font-semibold leading-tight tracking-tight text-ink">
+                <CountUp value={f.value} />
+              </dd>
+            </div>
+          </div>
+        ))}
+      </dl>
+
       {notice && (
         <div className={notice.kind === 'ok' ? 'alert-ok' : 'alert-error'} role={notice.kind === 'ok' ? 'status' : 'alert'}>
           {notice.text}
@@ -121,21 +144,27 @@ export const EventDetail: React.FC = () => {
       )}
 
       {/* Template */}
-      <section className="panel" aria-labelledby="sec-template">
+      <section className="panel overflow-hidden" aria-labelledby="sec-template">
         <div className="panel-head">
           <div>
-            <p className="eyebrow">01 Template</p>
+            <p className="eyebrow"><span className="text-seal-600">01</span> Template</p>
             <h2 id="sec-template" className="panel-title mt-1">Certificate template</h2>
           </div>
         </div>
         {templates.length > 0 ? (
           <ul className="divide-y divide-paper-200">
             {templates.map((tpl) => (
-              <li key={tpl.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+              <li key={tpl.id} className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
                 {tpl.layoutConfig && (
-                  <div className="w-full shrink-0 overflow-hidden rounded-md border border-paper-200 sm:w-48">
-                    <CertificateCanvas layout={tpl.layoutConfig} />
-                  </div>
+                  <Link
+                    to={`/events/${eventId}/templates/builder?templateId=${tpl.id}`}
+                    className="group relative block w-full shrink-0 rounded-lg bg-gradient-to-br from-paper-100 to-paper-200/60 p-3 sm:w-60"
+                    aria-label={`Edit template ${tpl.name}`}
+                  >
+                    <div className="overflow-hidden rounded-[4px] bg-white shadow-raise ring-1 ring-ink/5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:shadow-lift">
+                      <CertificateCanvas layout={tpl.layoutConfig} />
+                    </div>
+                  </Link>
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="eyebrow num">
@@ -147,8 +176,10 @@ export const EventDetail: React.FC = () => {
                     <span className="num">{tpl.layoutConfig?.textElements?.length || 0}</span> placeholder elements.
                   </p>
                 </div>
-                <Link to={`/events/${eventId}/templates/builder?templateId=${tpl.id}`} className="btn-secondary btn-sm self-start sm:self-center">
+                <Link to={`/events/${eventId}/templates/builder?templateId=${tpl.id}`} className="btn-secondary btn-sm group self-start sm:self-center">
+                  <Palette className="h-3.5 w-3.5" />
                   Edit template
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </Link>
               </li>
             ))}
@@ -168,10 +199,10 @@ export const EventDetail: React.FC = () => {
       </section>
 
       {/* Batches */}
-      <section className="panel" aria-labelledby="sec-batches">
+      <section className="panel overflow-hidden" aria-labelledby="sec-batches">
         <div className="panel-head">
           <div>
-            <p className="eyebrow">02 Batches</p>
+            <p className="eyebrow"><span className="text-seal-600">02</span> Batches</p>
             <h2 id="sec-batches" className="panel-title mt-1">
               Batches <span className="num text-ink-400">({batches.length})</span>
             </h2>
@@ -212,7 +243,10 @@ export const EventDetail: React.FC = () => {
                       <td className="num text-[12px]">{b.emailSentCount} / {b.totalCount}</td>
                       <td className={`num text-[12px] ${b.failedCount > 0 ? 'text-bad-700' : ''}`}>{b.failedCount}</td>
                       <td className="text-right">
-                        <Link to={`/batches/${b.id}/progress`} className="btn-ghost btn-sm">Live monitor</Link>
+                        <Link to={`/batches/${b.id}/progress`} className="btn-secondary btn-sm group">
+                          Live monitor
+                          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </Link>
                       </td>
                     </tr>
                   );
@@ -235,10 +269,10 @@ export const EventDetail: React.FC = () => {
       </section>
 
       {/* Certificates */}
-      <section className="panel" aria-labelledby="sec-certs">
+      <section className="panel overflow-hidden" aria-labelledby="sec-certs">
         <div className="panel-head">
           <div>
-            <p className="eyebrow">03 Certificates</p>
+            <p className="eyebrow"><span className="text-seal-600">03</span> Certificates</p>
             <h2 id="sec-certs" className="panel-title mt-1">
               Issued certificates <span className="num text-ink-400">({certificates.length})</span>
             </h2>
@@ -261,9 +295,14 @@ export const EventDetail: React.FC = () => {
                 {certificates.map((c) => (
                   <tr key={c.id}>
                     <td className="num whitespace-nowrap text-[12px] font-medium text-ink">{c.certificateNumber}</td>
-                    <td className="min-w-[160px]">
-                      <span className="font-medium text-ink">{c.participantName}</span>
-                      <p className="text-[12px] text-ink-500">{c.recipientEmail}</p>
+                    <td className="min-w-[200px]">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={c.participantName} />
+                        <div className="min-w-0">
+                          <span className="font-medium text-ink">{c.participantName}</span>
+                          <p className="text-[12px] text-ink-500">{c.recipientEmail}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="text-[12px]">{c.certificateType}</td>
                     <td><StatusStamp status={c.status} /></td>

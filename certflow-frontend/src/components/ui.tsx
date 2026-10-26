@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, X } from 'lucide-react';
 
@@ -81,18 +81,25 @@ interface PageHeaderProps {
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ eyebrow, title, description, actions, back }) => (
-  <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+  <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
     <div className="min-w-0">
       {back && (
         <Link
           to={back.to}
-          className="mb-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-500 transition-colors hover:text-seal-700"
+          className="group mb-4 inline-flex items-center gap-1.5 rounded-md text-[12px] font-semibold text-ink-500 transition-colors hover:text-seal-700"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
+          <span className="flex h-5 w-5 items-center justify-center rounded-md border border-paper-300 bg-white shadow-panel transition-transform group-hover:-translate-x-0.5">
+            <ArrowLeft className="h-3 w-3" />
+          </span>
           {back.label}
         </Link>
       )}
-      {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
+      {eyebrow && (
+        <p className="eyebrow mb-2.5 flex items-center gap-2">
+          <span className="h-px w-4 bg-seal-500/60" aria-hidden="true" />
+          {eyebrow}
+        </p>
+      )}
       <h1 className="page-title">{title}</h1>
       {description && <p className="page-lead">{description}</p>}
     </div>
@@ -118,6 +125,7 @@ const STATUS_TONES: Record<string, StampTone> = {
   ACTIVE: 'ok',
   VERIFIED: 'ok',
   PENDING: 'warn',
+  PARTIALLY_FAILED: 'warn',
   QUEUED: 'warn',
   SCHEDULED: 'warn',
   RETRYING: 'warn',
@@ -189,8 +197,14 @@ export const EmptyState: React.FC<{
   className?: string;
 }> = ({ title, description, action, icon, className = '' }) => (
   <div className={`flex flex-col items-center px-6 py-14 text-center ${className}`}>
-    {icon || <Seal size={44} tone="muted" mark="none" />}
-    <h3 className="mt-4 font-display text-[16px] font-semibold text-ink">{title}</h3>
+    <div className="relative flex h-20 w-20 items-center justify-center">
+      <span className="dot-grid absolute inset-0 rounded-full [mask-image:radial-gradient(circle,black_30%,transparent_70%)]" aria-hidden="true" />
+      <span className="absolute inset-2 rounded-full border border-dashed border-paper-300" aria-hidden="true" />
+      <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white text-ink-400 shadow-raise ring-1 ring-paper-200">
+        {icon || <Seal size={30} tone="muted" mark="none" />}
+      </span>
+    </div>
+    <h3 className="mt-4 font-display text-[16px] font-semibold tracking-tight text-ink">{title}</h3>
     {description && <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-500">{description}</p>}
     {action && <div className="mt-5">{action}</div>}
   </div>
@@ -198,7 +212,7 @@ export const EmptyState: React.FC<{
 
 export const Spinner: React.FC<{ className?: string; label?: string }> = ({ className = '', label }) => (
   <span className={`inline-flex items-center gap-2.5 text-[13px] text-ink-500 ${className}`} role="status">
-    <span className="h-4 w-4 animate-spin rounded-full border-2 border-seal-500 border-t-transparent" />
+    <span className="h-4 w-4 animate-spin rounded-full border-2 border-seal-500/25 border-t-seal-500" aria-hidden="true" />
     {label}
   </span>
 );
@@ -234,7 +248,7 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, description,
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`dialog ${width}`} role="dialog" aria-modal="true" aria-label={title}>
-        <div className="flex items-start justify-between gap-4 border-b border-paper-200 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-paper-200 px-6 py-5">
           <div className="min-w-0">
             <h3 className="font-display text-[17px] font-semibold tracking-tight text-ink">{title}</h3>
             {description && <p className="mt-1 text-[13px] leading-relaxed text-ink-500">{description}</p>}
@@ -243,10 +257,168 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, description,
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-paper-200 bg-paper-50 px-5 py-3.5">{footer}</div>}
+        <div className="max-h-[70vh] overflow-y-auto px-6 py-5">{children}</div>
+        {footer && <div className="flex justify-end gap-2 border-t border-paper-200 bg-paper-50/80 px-6 py-4">{footer}</div>}
       </div>
     </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/* Skeletons                                                           */
+/* ------------------------------------------------------------------ */
+
+export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <span className={`skeleton block ${className}`} aria-hidden="true" />
+);
+
+/** Placeholder rows shaped like a ledger table. */
+export const TableSkeleton: React.FC<{ rows?: number; cols?: number; label?: string }> = ({ rows = 6, cols = 5, label = 'Loading' }) => (
+  <div role="status" aria-label={label}>
+    <div className="flex gap-6 border-b border-paper-200 bg-paper-50/70 px-4 py-3">
+      {Array.from({ length: cols }).map((_, i) => (
+        <Skeleton key={i} className="h-2.5 flex-1 opacity-60" />
+      ))}
+    </div>
+    {Array.from({ length: rows }).map((_, r) => (
+      <div key={r} className="flex items-center gap-6 border-b border-paper-100 px-4 py-4 last:border-b-0">
+        {Array.from({ length: cols }).map((_, c) => (
+          <Skeleton key={c} className={`h-3 flex-1 ${c === 0 ? 'max-w-[180px]' : ''}`} />
+        ))}
+      </div>
+    ))}
+    <span className="sr-only">{label}</span>
+  </div>
+);
+
+/** Full-page placeholder: header, figure row and a table panel. */
+export const PageSkeleton: React.FC<{ label?: string; figures?: number }> = ({ label = 'Loading', figures = 4 }) => (
+  <div role="status" aria-label={label} className="animate-fade-in">
+    <div className="mb-8 space-y-3">
+      <Skeleton className="h-2.5 w-28" />
+      <Skeleton className="h-8 w-72 max-w-full" />
+      <Skeleton className="h-3 w-96 max-w-full" />
+    </div>
+    {figures > 0 && (
+      <div className={`mb-6 grid grid-cols-2 gap-4 ${figures >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+        {Array.from({ length: figures }).map((_, i) => (
+          <div key={i} className="panel space-y-3 p-5">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-6 w-16" />
+            <Skeleton className="h-2.5 w-24" />
+          </div>
+        ))}
+      </div>
+    )}
+    <div className="panel overflow-hidden">
+      <div className="panel-head">
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <TableSkeleton rows={5} label={label} />
+    </div>
+    <span className="sr-only">{label}</span>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
+/* Count-up number                                                     */
+/* ------------------------------------------------------------------ */
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/** Animates from the previous value to the new one. Honours reduced motion. */
+export const CountUp: React.FC<{ value: number; duration?: number; className?: string }> = ({
+  value,
+  duration = 700,
+  className,
+}) => {
+  const [shown, setShown] = useState(prefersReducedMotion() ? value : 0);
+  const from = useRef(shown);
+  useEffect(() => {
+    if (prefersReducedMotion()) {
+      setShown(value);
+      from.current = value;
+      return;
+    }
+    const start = performance.now();
+    const a = from.current;
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const v = Math.round(a + (value - a) * eased);
+      setShown(v);
+      if (p < 1) raf = requestAnimationFrame(tick);
+      else from.current = value;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      from.current = value;
+    };
+  }, [value, duration]);
+  return <span className={className}>{shown.toLocaleString()}</span>;
+};
+
+/* ------------------------------------------------------------------ */
+/* Icon chip                                                           */
+/* ------------------------------------------------------------------ */
+
+type ChipTone = 'seal' | 'foil' | 'ok' | 'warn' | 'bad' | 'info' | 'ink';
+
+const CHIP_CLASS: Record<ChipTone, string> = {
+  seal: 'border-seal-100 bg-seal-50 text-seal-700',
+  foil: 'border-foil-100 bg-foil-50 text-foil-600',
+  ok: 'border-ok-500/15 bg-ok-50 text-ok-700',
+  warn: 'border-warn-500/20 bg-warn-50 text-warn-700',
+  bad: 'border-bad-500/15 bg-bad-50 text-bad-700',
+  info: 'border-info-500/15 bg-info-50 text-info-700',
+  ink: 'border-paper-200 bg-paper-100 text-ink-600',
+};
+
+export const IconChip: React.FC<{ tone?: ChipTone; className?: string; children: React.ReactNode }> = ({
+  tone = 'seal',
+  className = '',
+  children,
+}) => (
+  <span className={`chip-icon ${CHIP_CLASS[tone]} ${className}`} aria-hidden="true">
+    {children}
+  </span>
+);
+
+/* ------------------------------------------------------------------ */
+/* Avatar                                                              */
+/* ------------------------------------------------------------------ */
+
+const AVATAR_TONES = [
+  'bg-seal-50 text-seal-700 ring-seal-100',
+  'bg-foil-50 text-foil-600 ring-foil-100',
+  'bg-info-50 text-info-700 ring-info-500/15',
+  'bg-paper-100 text-ink-600 ring-paper-200',
+  'bg-ok-50 text-ok-700 ring-ok-500/15',
+];
+
+/** Initials in a soft circle; the colour is stable for a given name. */
+export const Avatar: React.FC<{ name?: string | null; size?: 'sm' | 'md'; className?: string }> = ({
+  name,
+  size = 'md',
+  className = '',
+}) => {
+  const text = (name || '?').trim();
+  const parts = text.split(/[\s@.]+/).filter(Boolean);
+  const initials = ((parts[0]?.[0] || '?') + (parts.length > 1 && !text.includes('@') ? parts[1][0] : '')).toUpperCase();
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  const tone = AVATAR_TONES[h % AVATAR_TONES.length];
+  const dim = size === 'sm' ? 'h-7 w-7 text-[11px]' : 'h-8 w-8 text-[12px]';
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-display font-semibold ring-1 ${dim} ${tone} ${className}`}
+      aria-hidden="true"
+    >
+      {initials}
+    </span>
   );
 };
 

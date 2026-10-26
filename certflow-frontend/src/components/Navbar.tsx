@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Building2, ChevronDown, LogOut, Plus, Check } from 'lucide-react';
+import { ChevronsUpDown, ChevronDown, LogOut, Plus, Check, RotateCcw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import { Logo, Modal } from './ui';
 import { isDemo } from '../lib/env';
+import { resetDemoData } from '../demo';
 
 const ALL_NAV_ITEMS = [
   { to: '/', label: 'Overview', end: true },
@@ -28,6 +29,14 @@ export const Navbar: React.FC = () => {
   const [error, setError] = useState('');
   const orgRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -56,30 +65,42 @@ export const Navbar: React.FC = () => {
   };
 
   const initial = user?.fullName?.charAt(0).toUpperCase() || 'U';
+  const orgInitial = activeOrg?.organizationName?.charAt(0).toUpperCase() || 'O';
 
   return (
-    <header className="sticky top-0 z-30 border-b border-paper-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1240px] items-center gap-4 px-4 sm:px-6">
-        <Link to="/" className="shrink-0" aria-label="CertFlow home">
+    <header
+      className={`sticky top-0 z-30 border-b backdrop-blur-xl backdrop-saturate-150 transition-[background-color,box-shadow,border-color] duration-200 ${
+        scrolled
+          ? 'border-paper-200 bg-white/80 shadow-[0_1px_0_rgba(15,26,43,0.03),0_8px_24px_-12px_rgba(15,26,43,0.18)]'
+          : 'border-paper-200/70 bg-white/65'
+      }`}
+    >
+      <div className="mx-auto flex h-[60px] max-w-[1240px] items-center gap-3 px-4 sm:gap-4 sm:px-6">
+        <Link to="/" className="shrink-0 rounded-md" aria-label="CertFlow home">
           <Logo />
         </Link>
 
-        <span className="hidden h-5 w-px bg-paper-200 md:block" />
+        <span className="hidden h-6 w-px rotate-12 bg-paper-300 md:block" aria-hidden="true" />
 
         {/* Organization switcher */}
         <div className="relative hidden md:block" ref={orgRef}>
           <button
             type="button"
             onClick={() => setShowOrgMenu((v) => !v)}
-            className="flex h-8 items-center gap-2 rounded-md border border-paper-200 bg-paper-50 px-2.5 text-[13px] font-medium text-ink-700 transition-colors hover:border-ink-300"
+            className={`flex h-9 items-center gap-2 rounded-lg py-1 pl-1 pr-2 text-[13px] font-semibold text-ink-700 transition-colors hover:bg-paper-100 ${
+              showOrgMenu ? 'bg-paper-100' : ''
+            }`}
             aria-expanded={showOrgMenu}
+            aria-haspopup="menu"
           >
-            <Building2 className="h-3.5 w-3.5 text-seal-600" />
-            <span className="max-w-[160px] truncate">{activeOrg?.organizationName || 'Select organization'}</span>
-            <ChevronDown className="h-3 w-3 text-ink-400" />
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-seal-500 to-seal-700 font-display text-[11px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+              {orgInitial}
+            </span>
+            <span className="max-w-[180px] truncate">{activeOrg?.organizationName || 'Select organization'}</span>
+            <ChevronsUpDown className="h-3.5 w-3.5 text-ink-400" />
           </button>
           {showOrgMenu && (
-            <div className="menu left-0 top-10">
+            <div className="menu left-0 top-11 w-72" role="menu">
               <p className="eyebrow px-2.5 pb-1.5 pt-1">Organizations</p>
               {user?.organizations?.map((org) => {
                 const active = activeOrg?.organizationId === org.organizationId;
@@ -93,11 +114,20 @@ export const Navbar: React.FC = () => {
                       setShowOrgMenu(false);
                     }}
                   >
-                    <span className="flex min-w-0 items-center gap-2">
-                      {active ? <Check className="h-3.5 w-3.5 shrink-0 text-seal-600" /> : <span className="w-3.5 shrink-0" />}
-                      <span className={`truncate ${active ? 'font-semibold text-ink' : ''}`}>{org.organizationName}</span>
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-display text-[11px] font-bold ${
+                          active ? 'bg-gradient-to-br from-seal-500 to-seal-700 text-white' : 'bg-paper-200 text-ink-600'
+                        }`}
+                      >
+                        {org.organizationName.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="min-w-0">
+                        <span className={`block truncate ${active ? 'font-semibold text-ink' : ''}`}>{org.organizationName}</span>
+                        <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-400">{org.role}</span>
+                      </span>
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink-400">{org.role}</span>
+                    {active && <Check className="h-4 w-4 shrink-0 text-seal-600" />}
                   </button>
                 );
               })}
@@ -118,22 +148,27 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
-        <nav className="ml-2 hidden flex-1 items-center gap-0.5 lg:flex" aria-label="Primary">
+        <nav className="ml-1 hidden flex-1 items-center gap-0.5 lg:flex" aria-label="Primary">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `relative rounded-md px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                  isActive ? 'text-ink' : 'text-ink-500 hover:text-ink'
+                `relative rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors duration-150 ${
+                  isActive ? 'bg-ink/[0.05] text-ink' : 'text-ink-500 hover:bg-ink/[0.035] hover:text-ink'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
                   {item.label}
-                  {isActive && <span className="absolute inset-x-3 -bottom-[13px] h-[2px] rounded-full bg-seal-600" />}
+                  {isActive && (
+                    <span
+                      className="absolute inset-x-3 -bottom-[13px] h-[2px] rounded-full bg-gradient-to-r from-seal-500 to-seal-600 shadow-[0_0_8px_rgba(18,135,127,0.55)]"
+                      aria-hidden="true"
+                    />
+                  )}
                 </>
               )}
             </NavLink>
@@ -145,22 +180,49 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowUserMenu((v) => !v)}
-              className="flex h-8 items-center gap-2 rounded-md pl-1 pr-2 transition-colors hover:bg-paper-100"
+              className={`flex h-9 items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors hover:bg-paper-100 ${
+                showUserMenu ? 'bg-paper-100' : ''
+              }`}
               aria-expanded={showUserMenu}
+              aria-haspopup="menu"
+              aria-label="Account menu"
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink font-display text-[11px] font-semibold text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink font-display text-[12px] font-semibold text-white ring-2 ring-white shadow-[0_0_0_3px_rgba(18,135,127,0.25)]">
                 {initial}
               </span>
               <span className="hidden text-[13px] font-semibold text-ink-700 sm:block">{user?.fullName}</span>
-              <ChevronDown className="h-3 w-3 text-ink-400" />
+              <ChevronDown className={`h-3.5 w-3.5 text-ink-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
             </button>
             {showUserMenu && (
-              <div className="menu right-0 top-10">
-                <div className="border-b border-paper-100 px-2.5 pb-2.5 pt-1.5">
-                  <p className="text-[13px] font-semibold text-ink">{user?.fullName}</p>
-                  <p className="truncate text-[12px] text-ink-400">{user?.email}</p>
+              <div className="menu right-0 top-11 w-64" role="menu">
+                <div className="flex items-center gap-3 border-b border-paper-100 px-2.5 pb-3 pt-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink font-display text-[14px] font-semibold text-white">
+                    {initial}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-semibold text-ink">{user?.fullName}</p>
+                    <p className="truncate text-[12px] text-ink-400">{user?.email}</p>
+                  </div>
                 </div>
-                <button type="button" className="menu-item mt-1 justify-start gap-2 text-bad-500" onClick={logout}>
+                {activeOrg && (
+                  <div className="flex items-center justify-between gap-2 px-2.5 py-2 text-[12px] text-ink-500 md:hidden">
+                    <span className="truncate">{activeOrg.organizationName}</span>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink-400">{activeOrg.role}</span>
+                  </div>
+                )}
+                {isDemo && (
+                  <button
+                    type="button"
+                    className="menu-item mt-1 justify-start gap-2"
+                    onClick={() => {
+                      resetDemoData();
+                    }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 text-ink-400" />
+                    Reset sample data
+                  </button>
+                )}
+                <button type="button" className="menu-item mt-1 justify-start gap-2 text-bad-500 hover:!bg-bad-50 hover:!text-bad-700" onClick={logout}>
                   <LogOut className="h-3.5 w-3.5" />
                   Sign out
                 </button>
@@ -171,15 +233,15 @@ export const Navbar: React.FC = () => {
       </div>
 
       {/* Compact navigation for narrow screens */}
-      <nav className="flex gap-1 overflow-x-auto border-t border-paper-100 px-3 py-1.5 lg:hidden" aria-label="Primary">
+      <nav className="flex gap-1 overflow-x-auto border-t border-paper-200/60 px-3 py-2 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden" aria-label="Primary">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `shrink-0 rounded-md px-3 py-1.5 text-[13px] font-semibold ${
-                isActive ? 'bg-seal-50 text-seal-700' : 'text-ink-500'
+              `shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                isActive ? 'bg-ink text-white shadow-raise' : 'text-ink-500 hover:bg-paper-100 hover:text-ink'
               }`
             }
           >

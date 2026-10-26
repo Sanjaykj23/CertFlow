@@ -191,7 +191,7 @@ export const Register: React.FC = () => {
               <div className="alert-info items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Info className="h-4 w-4 shrink-0" />
-                  Demo code: <span className="num font-semibold">{demoOtp}</span>
+                  Verification code: <span className="num font-semibold">{demoOtp}</span>
                 </span>
                 <button type="button" className="btn-secondary btn-sm" onClick={() => setOtp(demoOtp.replace(/[^0-9]/g, '').slice(0, 6))}>
                   Use this code

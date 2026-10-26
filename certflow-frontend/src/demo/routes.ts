@@ -470,7 +470,7 @@ route('POST', '/organizations/:orgId/members', (c) => {
   let user = Object.values(c.db.users).find((u) => u.email === email);
   if (!user) {
     const local = email.split('@')[0];
-    user = { id: uuid(), email, fullName: local.charAt(0).toUpperCase() + local.slice(1), password: 'Demo@1234', createdAt: c.now };
+    user = { id: uuid(), email, fullName: local.charAt(0).toUpperCase() + local.slice(1), password: 'CertFlow@2026', createdAt: c.now };
     c.db.users[user.id] = user;
   }
   if (c.db.members.some((m) => m.orgId === orgId && m.userId === user!.id)) {
@@ -977,6 +977,6 @@ export function handleRequest(db: DB, req: ApiRequest, now: number = Date.now())
     return { status: 200, body: out, headers };
   } catch (e) {
     if (e instanceof HttpError) return fail(e.status, e.message);
-    return fail(500, `Demo backend error: ${(e as Error)?.message ?? e}`);
+    return fail(500, `Server error: ${(e as Error)?.message ?? e}`);
   }
 }

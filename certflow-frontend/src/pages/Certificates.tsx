@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Search, Download, RotateCcw, Ban, Repeat, Eye, ShieldCheck, Copy, Check } from 'lucide-react';
-import { PageHeader, StatusStamp, EmptyState, PageLoading, Modal, formatWhen } from '../components/ui';
+import { PageHeader, StatusStamp, EmptyState, PageLoading, Modal, TableSkeleton, Avatar, formatWhen } from '../components/ui';
 import { CertificateCanvas } from '../components/CertificateCanvas';
 import { downloadCertificate, verifyAbsoluteUrl } from '../lib/links';
 
@@ -218,8 +218,8 @@ export const Certificates: React.FC = () => {
         </div>
       )}
 
-      <section className="panel mb-5">
-        <div className="panel-body grid gap-3 sm:grid-cols-[minmax(0,16rem)_1fr]">
+      <section className="panel overflow-hidden">
+        <div className="grid gap-3 border-b border-paper-200/80 bg-gradient-to-b from-paper-50/80 to-white p-4 sm:grid-cols-[minmax(0,16rem)_1fr] sm:p-5">
           <div>
             <label htmlFor="cert-event" className="label">Event</label>
             <select
@@ -252,11 +252,30 @@ export const Certificates: React.FC = () => {
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="panel overflow-hidden">
+        {!loading && certificates.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-paper-100 px-5 py-3 text-[12px] text-ink-500">
+            <span>
+              <span className="num font-semibold text-ink">{filtered.length}</span>
+              {filtered.length !== certificates.length && <span className="num"> of {certificates.length}</span>} shown
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <i className="h-1.5 w-1.5 rounded-full bg-ok-500" aria-hidden="true" />
+              <span className="num font-semibold text-ink">{certificates.filter((c) => c.status !== 'REVOKED' && c.status !== 'REPLACED').length}</span> valid
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <i className="h-1.5 w-1.5 rounded-full bg-bad-500" aria-hidden="true" />
+              <span className="num font-semibold text-ink">{certificates.filter((c) => c.status === 'REVOKED').length}</span> revoked
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <i className="h-1.5 w-1.5 rounded-full bg-warn-500" aria-hidden="true" />
+              <span className="num font-semibold text-ink">{certificates.filter((c) => c.emailStatus === 'FAILED').length}</span> email failures
+            </span>
+          </div>
+        )}
+
         {loading ? (
-          <PageLoading label="Loading certificates" />
+          <TableSkeleton rows={6} cols={6} label="Loading certificates" />
         ) : filtered.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="ledger w-full">
@@ -276,8 +295,13 @@ export const Certificates: React.FC = () => {
                   <tr key={c.id}>
                     <td className="whitespace-nowrap font-mono text-[12px] font-medium text-ink">{c.certificateNumber}</td>
                     <td>
-                      <p className="font-medium text-ink">{c.participantName}</p>
-                      <p className="font-mono text-[11px] text-ink-500">{c.recipientEmail}</p>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={c.participantName} />
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink">{c.participantName}</p>
+                          <p className="font-mono text-[11px] text-ink-500">{c.recipientEmail}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="text-ink-600">{eventName(c) || '-'}</td>
                     <td>
@@ -349,6 +373,7 @@ export const Certificates: React.FC = () => {
           </div>
         ) : (
           <EmptyState
+            icon={certificates.length === 0 ? undefined : <Search className="h-5 w-5" />}
             title={certificates.length === 0 ? 'No certificates issued yet' : 'No certificates match your search'}
             description={
               certificates.length === 0
@@ -384,7 +409,7 @@ export const Certificates: React.FC = () => {
             {viewLoading ? (
               <PageLoading label="Loading template" />
             ) : (
-              <div className="relative overflow-hidden border border-paper-300 bg-white">
+              <div className="relative overflow-hidden rounded-lg border border-paper-200 bg-white shadow-raise">
                 <CertificateCanvas
                   layout={viewTemplate?.layoutConfig}
                   values={{

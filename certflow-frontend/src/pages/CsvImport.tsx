@@ -209,7 +209,7 @@ export const CsvImport: React.FC = () => {
         back={{ to: `/events/${eventId}`, label: 'Back to event' }}
       />
 
-      <ol className="mb-6 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Progress">
+      <ol className="panel mb-6 grid grid-cols-1 gap-3 p-4 sm:grid-cols-3 sm:gap-0 sm:px-5" aria-label="Progress">
         {STEPS.map((label, i) => {
           const n = i + 1;
           const done = n < currentStep;
@@ -218,18 +218,26 @@ export const CsvImport: React.FC = () => {
             <li
               key={label}
               aria-current={active ? 'step' : undefined}
-              className={`flex items-center gap-3 border-b-2 px-1 pb-2 ${
-                active ? 'border-seal-500' : done ? 'border-seal-300' : 'border-paper-200'
-              }`}
+              className="flex items-center gap-3"
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[12px] font-semibold ${
-                  active ? 'bg-seal-600 text-white' : done ? 'bg-seal-100 text-seal-700' : 'bg-paper-100 text-ink-400'
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-mono text-[12px] font-semibold transition-all duration-300 ${
+                  active
+                    ? 'bg-gradient-to-b from-seal-500 to-seal-600 text-white shadow-glow'
+                    : done
+                    ? 'bg-seal-50 text-seal-700 ring-1 ring-seal-200'
+                    : 'bg-white text-ink-400 ring-1 ring-paper-300'
                 }`}
               >
-                {done ? <Check className="h-3.5 w-3.5" /> : n}
+                {done ? <Check className="h-4 w-4" strokeWidth={2.5} /> : n}
               </span>
-              <span className={`text-[13px] font-semibold ${active ? 'text-ink' : 'text-ink-500'}`}>{label}</span>
+              <span className="min-w-0">
+                <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Step {n}</span>
+                <span className={`block text-[13px] font-semibold ${active ? 'text-ink' : done ? 'text-seal-700' : 'text-ink-500'}`}>{label}</span>
+              </span>
+              {i < STEPS.length - 1 && (
+                <span className={`mx-4 hidden h-px flex-1 sm:block ${done ? 'bg-seal-500' : 'bg-paper-300'}`} aria-hidden="true" />
+              )}
             </li>
           );
         })}
@@ -254,7 +262,7 @@ export const CsvImport: React.FC = () => {
       <section className="panel mb-6">
         <div className="panel-head">
           <h2 className="panel-title">
-            <span className="font-mono text-ink-400">1</span> Choose template and file
+            <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-seal-50 align-[2px] font-mono text-[11px] text-seal-700">1</span> Choose template and file
           </h2>
           <button type="button" onClick={downloadSampleCsv} className="btn-ghost btn-sm">
             <Download className="h-3.5 w-3.5" />
@@ -310,18 +318,25 @@ export const CsvImport: React.FC = () => {
                 }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
-                className={`flex flex-col items-center justify-center rounded-panel border-2 border-dashed px-5 py-8 text-center transition-colors ${dropClass}`}
+                className={`relative flex flex-col items-center justify-center overflow-hidden rounded-panel border-2 border-dashed px-5 py-10 text-center transition-all duration-200 ${dropClass}`}
               >
-                <FileSpreadsheet className={`mb-2 h-9 w-9 ${file || dragging ? 'text-seal-600' : 'text-ink-300'}`} />
-                <p className="text-[14px] font-semibold text-ink">
+                <span className="dot-grid pointer-events-none absolute inset-0 opacity-50 [mask-image:radial-gradient(ellipse_at_center,black_10%,transparent_70%)]" aria-hidden="true" />
+                <span
+                  className={`relative mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-raise ring-1 transition-transform duration-200 ${
+                    dragging ? 'scale-110 ring-seal-200' : 'ring-paper-200'
+                  }`}
+                >
+                  <FileSpreadsheet className={`h-7 w-7 ${file || dragging ? 'text-seal-600' : 'text-ink-400'}`} strokeWidth={1.5} />
+                </span>
+                <p className="relative text-[14px] font-semibold text-ink">
                   {dragging ? 'Drop the CSV to upload it' : file ? file.name : 'Drag a CSV here'}
                 </p>
-                <p className="hint mt-1">
+                <p className="hint relative mt-1">
                   {file && !dragging
                     ? `${(file.size / 1024).toFixed(1)} KB. Choose another file to replace it.`
                     : 'Only .csv files are accepted.'}
                 </p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <div className="relative mt-5 flex flex-wrap justify-center gap-2">
                   <button type="button" className="btn-primary" onClick={() => inputRef.current?.click()}>
                     <Upload className="h-4 w-4" />
                     Select CSV file
@@ -378,20 +393,20 @@ export const CsvImport: React.FC = () => {
         <section className="panel mb-6">
           <div className="panel-head">
             <h2 className="panel-title">
-              <span className="font-mono text-ink-400">2</span> Review validation
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-seal-50 align-[2px] font-mono text-[11px] text-seal-700">2</span> Review validation
             </h2>
           </div>
           <div className="panel-body space-y-5">
-            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-paper-200 bg-paper-200 sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { k: 'Total rows', v: validationResult.totalRows ?? rows.length, c: 'text-ink' },
                 { k: 'Valid', v: validationResult.validRows, c: 'text-ok-700' },
                 { k: 'Invalid', v: validationResult.invalidRows, c: validationResult.invalidRows > 0 ? 'text-bad-700' : 'text-ink' },
                 { k: 'Duplicates', v: duplicateCount, c: duplicateCount > 0 ? 'text-warn-700' : 'text-ink' },
               ].map((s) => (
-                <div key={s.k} className="bg-white px-4 py-3">
+                <div key={s.k} className="rounded-lg border border-paper-200 bg-paper-50/60 px-4 py-3">
                   <dt className="eyebrow">{s.k}</dt>
-                  <dd className={`mt-1 font-mono text-[26px] font-semibold leading-none ${s.c}`}>{s.v}</dd>
+                  <dd className={`mt-1.5 font-display text-[26px] font-semibold leading-none tracking-tight ${s.c}`}>{s.v}</dd>
                 </div>
               ))}
             </dl>
@@ -400,7 +415,7 @@ export const CsvImport: React.FC = () => {
               <p className="hint">Only valid rows are issued. Rows marked below are skipped.</p>
             )}
 
-            <div className="max-h-96 overflow-auto">
+            <div className="max-h-96 overflow-auto rounded-lg border border-paper-200">
               <table className="ledger w-full min-w-[560px] text-left">
                 <thead>
                   <tr>
@@ -413,7 +428,7 @@ export const CsvImport: React.FC = () => {
                 </thead>
                 <tbody>
                   {rows.map((r: any, idx: number) => (
-                    <tr key={idx} className={r.valid ? '' : 'bg-bad-50'}>
+                    <tr key={idx} className={r.valid ? '' : 'bg-bad-50/60'}>
                       <td className="font-mono text-[12px] text-ink-400">{r.rowIndex}</td>
                       <td className="font-semibold text-ink">{r.participantName || <span className="text-ink-400">Empty</span>}</td>
                       <td className="font-mono text-[12px] break-all">{r.email || <span className="text-ink-400">Empty</span>}</td>
@@ -435,10 +450,11 @@ export const CsvImport: React.FC = () => {
       )}
 
       {validationResult && (
-        <section className="panel">
+        <section className="panel relative overflow-hidden border-seal-200">
+          <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-seal-500 via-seal-200 to-foil-400" aria-hidden="true" />
           <div className="panel-head">
             <h2 className="panel-title">
-              <span className="font-mono text-ink-400">3</span> Launch batch
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-seal-50 align-[2px] font-mono text-[11px] text-seal-700">3</span> Launch batch
             </h2>
           </div>
           <div className="panel-body flex flex-wrap items-center justify-between gap-4">
